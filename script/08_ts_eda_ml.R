@@ -13,7 +13,8 @@ cat("\014") # Clears the console
 rm(list = ls()) # Remove all variables
 
 # 01-creating AND visualizing ts
-# refer to https://www.r-bloggers.com/2021/12/time-series-forecasting-lab-part-1-introduction-to-feature-engineering/
+# https://www.r-bloggers.com/2021/12/time-series-forecasting-lab-part-1-introduction-to-feature-engineering/
+# https://www.r-bloggers.com/2020/06/time-series-in-5-minutes-part-1-visualization-with-the-time-plot/#google_vignette
 # A) using ts() or zoo() to create ts
 # https://rpubs.com/ravipmum/Time_Series_Fundamentals
 mydata = runif(n = 50, min = 10, max = 45)# Create a Vector of 50 evenly observations
@@ -77,7 +78,61 @@ monthly_retail_tbl |>
                    .smooth      = TRUE,
                    .interactive = FALSE)
 
-# check some diagnostics with timetk package
+# 02-pre-processing and exploratory analysis
+# A) Find missing data and imputation 
+# https://www.kaggle.com/code/janiobachmann/time-series-i-an-introductory-start?scriptVersionId=53165252
+# https://business-science.github.io/timetk/articles/TK07_Time_Series_Data_Wrangling.html
+
+library(DataExplorer)
+library(ggthemes)
+
+monthly_retail_tbl |> # detect missing data
+  group_by(Industry) |>
+  pad_by_time(Month, .by = "auto")
+
+monthly_retail_tbl |> 
+  group_by(Industry == Industries[1]) |>
+  plot_missing(
+    ggtheme = theme_calc(), 
+    title = "Percent Missing Values by Column"
+  )
+
+monthly_retail_tbl |> # imputate missing data
+  filter(Industry == Industries[1]) |>
+  pad_by_time(Month, .by = "month") |>
+  mutate_at(vars(Turnover), 
+            .funs = ts_impute_vec, period = 1) 
+
+monthly_retail_tbl |> # re-plot the ts
+  filter(Industry == Industries[1]) |>
+  plot_time_series(Month, Turnover, 
+                   .facet_scale = "free",
+                   .interactive = FALSE,
+                   .title = "stock prices") 
+
+# B) Detect the outlier in timeseries
+# https://business-science.github.io/timetk/articles/TK08_Automatic_Anomaly_Detection.html
+anomalizes <- 
+  monthly_retail_tbl |> # detect outliers
+  filter(Industry == Industries[1]) |>
+  anomalize(.date_var = Month,
+            .value = Turnover,
+            .iqr_alpha = 0.05,
+            .max_anomalies = 0.20,
+            .message = FALSE) |> 
+  glimpse()
+
+anomalizes |> # Anomaly Detection Plot
+  # filter(Industry == Industries[1]) |>
+  plot_anomalies(Month,
+                 .facet_ncol = 2)
+
+anomalizes |> # Anomalies Cleaned Plot
+  plot_anomalies_cleaned(Month,
+                         .facet_ncol = 2)
+
+
+# C) check regular and seasonal diagnostics 
 
 monthly_retail_tbl |> # the regularity of ts by checking scale 
   group_by(Industry) |>
@@ -88,10 +143,31 @@ monthly_retail_tbl |> # perform the seasonal diagnostics
   tk_seasonal_diagnostics(.date_var = Month,
                           .value = Turnover)
 
-monthly_retail_tbl %>% 
-  filter(Industry == Industries[1]) %>%
+monthly_retail_tbl |> 
+  filter(Industry == Industries[1]) |>
   plot_seasonal_diagnostics(.date_var = Month,
                             .value = Turnover,
                             .title = Industries[1],
                             .interactive = FALSE)
 
+# D) perform ACF and PACF diagnostics 
+# https://www.kaggle.com/code/janiobachmann/time-series-ii-feature-engineering-concepts
+
+color_pal <- c("#5C5C5C", "#EA3B46")
+monthly_retail_tbl |>
+  tk_acf_diagnostics(
+    .date_var = Month,
+    .value = Turnover
+  ) |> 
+  pivot_longer(cols = c("ACF", "PACF")) |> 
+  ggplot(aes(x=lag, y=value, color=name)) + 
+  geom_line(size=1) + 
+  geom_point(size=0.5) +
+  facet_wrap(~name) + 
+  theme_bw() + 
+  scale_color_manual(values = color_pal) +
+  theme(legend.position = "bottom", strip.background =element_rect(fill="#BDBDBD")) + 
+  labs(
+    title = "Autocorrelation and Partial Auto Correlation",
+    color = "Metric"
+  )
