@@ -169,3 +169,329 @@ monthly_retail_tbl |>
 plot_acf_diagnostics(Month, Turnover, 
                      # .lags = 440,
                      .interactive = FALSE)
+
+# 03-forecasting model with Feature engineering
+# log transformation and standardization of data
+# https://www.r-bloggers.com/2021/12/time-series-forecasting-lab-part-1-introduction-to-feature-engineering/
+# https://www.kaggle.com/code/janiobachmann/time-series-ii-feature-engineering-concepts
+
+monthly_retail_tbl |>
+  filter(Industry == Industries[1]) |>
+  # mutate(Turnover =  log1p(x = Turnover)) |>
+  # mutate(Turnover =  standardize_vec(Turnover)) |>
+  plot_time_series(Month,Turnover,
+                   .facet_scale = "free",
+                   .interactive = FALSE)
+
+# log transformation and standardization of data
+monthly_retail_tbl |>
+  filter(Industry == Industries[1]) |>
+  # log transformation and standardization of measure
+  mutate(Turnover =  log1p(x = Turnover)) |>
+  mutate(Turnover =  standardize_vec(Turnover)) |>
+  # add Calendar-based features
+  tk_augment_timeseries_signature(.date_var = Month) |> 
+  glimpse()
+
+# Add Calendar-based (or signature) features
+library(fastDummies)  # for dummyfying categorical variables
+monthly_retail_tbl |>
+  filter(Industry == Industries[1]) |>
+  # log transformation and standardization of measure
+  mutate(Turnover =  log1p(x = Turnover)) |>
+  mutate(Turnover =  standardize_vec(Turnover)) |>
+  # add Calendar-based features
+  tk_augment_timeseries_signature(.date_var = Month) |>
+  select(-diff, -matches("(.xts$)|(.iso$)|(hour)|(minute)|(second)|(day)|(week)|(am.pm)")) %>%
+  dummy_cols(select_columns = c("month.lbl")) |>
+  select(-month.lbl) |>
+  mutate(index.num = normalize_vec(x = index.num)) |>
+  mutate(year = normalize_vec(x = year)) |>
+  # Perfom linear regression WITH FEATURE ENGINEERING
+  plot_time_series_regression(.date_var = Month, 
+                              .formula = Turnover ~ as.numeric(Month) + 
+                                index.num + year + half + quarter + month +
+                                month.lbl_January + month.lbl_February + month.lbl_March + month.lbl_April +
+                                month.lbl_May + month.lbl_June + month.lbl_July + month.lbl_August + 
+                                month.lbl_September + month.lbl_October + month.lbl_November + month.lbl_December, 
+                              .title = "Linear Model With Feature Engineering",
+                              .interactive = FALSE,
+                              .show_summary = TRUE)
+
+monthly_retail_tbl |>
+  filter(Industry == Industries[1]) |>
+  # log transformation and standardization of measure
+  mutate(Turnover =  log1p(x = Turnover)) |>
+  mutate(Turnover =  standardize_vec(Turnover)) |>
+  # # add Calendar-based features
+  # tk_augment_timeseries_signature(.date_var = Month) |>
+  # select(-diff, -matches("(.xts$)|(.iso$)|(hour)|(minute)|(second)|(day)|(week)|(am.pm)")) %>%
+  # dummy_cols(select_columns = c("month.lbl")) |>
+  # select(-month.lbl) |>
+  # mutate(index.num = normalize_vec(x = index.num)) |>
+  # mutate(year = normalize_vec(x = year)) |>
+  # Perfom linear regression
+  plot_time_series_regression(.date_var = Month, 
+                              .formula = Turnover ~ as.numeric(Month),
+                              .title = "Linear Model Without Feature Engineering",
+                              .interactive = FALSE,
+                              .show_summary = TRUE)
+
+# Add Fourier features
+monthly_retail_tbl |>
+  filter(Industry == Industries[1]) |>
+  # log transformation and standardization of measure
+  mutate(Turnover =  log1p(x = Turnover)) |>
+  mutate(Turnover =  standardize_vec(Turnover)) |>
+  # add Calendar-based features
+  tk_augment_timeseries_signature(.date_var = Month) |>
+  select(-diff, -matches("(.xts$)|(.iso$)|(hour)|(minute)|(second)|(day)|(week)|(am.pm)")) %>%
+  dummy_cols(select_columns = c("month.lbl")) |>
+  select(-month.lbl) |>
+  mutate(index.num = normalize_vec(x = index.num)) |>
+  mutate(year = normalize_vec(x = year)) |>
+  # add Fourier features
+  tk_augment_fourier(.date_var = Month, .periods = 12, .K = 1) |>
+  # Perfom linear regression
+  plot_time_series_regression(.date_var = Month, 
+                              .formula = Turnover ~ as.numeric(Month) + 
+                                index.num + year + half + quarter + month +
+                                month.lbl_January + month.lbl_February + month.lbl_March + month.lbl_April +
+                                month.lbl_May + month.lbl_June + month.lbl_July + month.lbl_August + 
+                                month.lbl_September + month.lbl_October + month.lbl_November + month.lbl_December +
+                                Month_sin12_K1 + Month_cos12_K1,
+                              .title = "Linear Model With Fourier terms",
+                              .interactive = FALSE,
+                              .show_summary = TRUE)
+
+# Add lagged features
+
+monthly_retail_tbl |>
+  filter(Industry == Industries[1]) |>
+  mutate(Turnover =  log1p(x = Turnover)) |>
+  mutate(Turnover =  standardize_vec(Turnover)) |> 
+  tk_augment_timeseries_signature(.date_var = Month) |> 
+  select(-diff, -matches("(.xts$)|(.iso$)|(hour)|(minute)|(second)|(day)|(week)|(am.pm)")) %>%
+  dummy_cols(select_columns = c("month.lbl")) |>
+  select(-month.lbl) |>
+  mutate(index.num = normalize_vec(x = index.num)) |>
+  mutate(year = normalize_vec(x = year)) |>
+  tk_augment_fourier(.date_var = Month, .periods = 12, .K = 1) |>
+  tk_augment_lags(.value = Turnover, .lags = c(12, 13)) |>
+  plot_time_series_regression(.date_var = Month, 
+                              .formula = Turnover ~ as.numeric(Month) +
+                                index.num + year + half + quarter + month +
+                                month.lbl_January + month.lbl_February + month.lbl_March + month.lbl_April +
+                                month.lbl_May + month.lbl_June + month.lbl_July + month.lbl_August + 
+                                month.lbl_September + month.lbl_October + month.lbl_November + month.lbl_December +
+                                Month_sin12_K1 + Month_cos12_K1 +
+                                Turnover_lag12 + Turnover_lag13, 
+                              .title = "Linear Model With lagged features",
+                              .interactive =FALSE,
+                              .show_summary = TRUE)
+
+# Rolling Lags features
+monthly_retail_tbl |>
+  filter(Industry == Industries[1]) |>
+  mutate(Turnover =  log1p(x = Turnover)) |>
+  mutate(Turnover =  standardize_vec(Turnover)) |>
+  tk_augment_timeseries_signature(.date_var = Month) |> 
+  select(-diff, -matches("(.xts$)|(.iso$)|(hour)|(minute)|(second)|(day)|(week)|(am.pm)")) |>
+  dummy_cols(select_columns = c("month.lbl")) |>
+  select(-month.lbl) |>
+  mutate(index.num = normalize_vec(x = index.num)) |>
+  mutate(year = normalize_vec(x = year)) |>
+  tk_augment_fourier(.date_var = Month, .periods = 12, .K = 1) |>
+  tk_augment_lags(.value = Turnover, .lags = c(12, 13)) |>
+  tk_augment_slidify(.value   = c(Turnover_lag12, Turnover_lag13),
+                     .f       = ~ mean(.x, na.rm = TRUE), 
+                     .period  = c(3, 6, 9, 12),
+                     .partial = TRUE,
+                     .align   = "center") |>
+  plot_time_series_regression(.date_var = Month, 
+                              .formula = Turnover ~ as.numeric(Month) + 
+                                index.num + year + half + quarter + month +
+                                month.lbl_January + month.lbl_February + month.lbl_March + month.lbl_April +
+                                month.lbl_May + month.lbl_June + month.lbl_July + month.lbl_August + 
+                                month.lbl_September + month.lbl_October + month.lbl_November + month.lbl_December +
+                                Month_sin12_K1 + Month_cos12_K1 + 
+                                Turnover_lag12 + Turnover_lag12_roll_3  + Turnover_lag12_roll_6  + Turnover_lag12_roll_9 + Turnover_lag12_roll_12 +
+                                Turnover_lag13 + Turnover_lag13_roll_3  + Turnover_lag13_roll_6  + Turnover_lag13_roll_9 + Turnover_lag13_roll_12,
+                              .title = "Linear Model With rolling features",
+                              .interactive =FALSE,
+                              .show_summary = TRUE)
+
+# 04-uniforming feature engineering with recipes
+# https://www.business-science.io/time-series/2020/03/18/time-series-machine-learning.html
+# load the data
+aus_retail_tbl <- aus_retail |> # convert df to tibble for timetk
+  tk_tbl()
+
+monthly_retail_tbl <- aus_retail_tbl |>
+  filter(State == "Australian Capital Territory") |> # focus on a state
+  mutate(Month = as.Date(Month)) |>
+  mutate(Industry = as_factor(Industry)) |>
+  select(Month, Industry, Turnover) |>
+  glimpse()
+
+monthly_retail_tbl |>
+  filter(Industry == Industries[1]) |>
+  plot_time_series(Month,Turnover,
+                   .facet_scale = "free",
+                   .interactive = FALSE)
+
+# split data into training/testing regions
+library(tidyquant)
+monthly_retail_tbl |>
+  filter(Industry == Industries[1]) |>
+  ggplot(aes(x = Month, y = Turnover)) +
+  geom_rect(xmin = as.numeric(ymd("2010-07-01")),
+            xmax = as.numeric(ymd("2019-01-01")),
+            ymin = 0, ymax = 50,
+            fill = palette_light()[[4]], alpha = 0.01) +
+  annotate("text", x = ymd("1990-04-01"), y = 30,
+           color = palette_light()[[1]], label = "Train Region") +
+  annotate("text", x = ymd("2014-07-01"), y = 20,
+           color = palette_light()[[1]], label = "Test Region") +
+  geom_point(alpha = 0.5, color = palette_light()[[1]]) +
+  labs(title = "stock price", x = "") +
+  theme_tq()
+
+train_tbl <- monthly_retail_tbl |> 
+  select(-Industry) |>
+  filter(Month < ymd("2010-07-01"))
+test_tbl  <- monthly_retail_tbl |> 
+  select(-Industry) |>
+  filter(Month >= ymd("2010-07-01"))
+
+# Add time series signature to training data
+library(recipes)
+recipe_spec_timeseries <- recipe(Turnover ~ ., data = train_tbl) |>
+  step_timeseries_signature(Month) 
+
+bake(prep(recipe_spec_timeseries), new_data = train_tbl)
+
+# Building Engineered Features on Top of the Recipe
+
+recipe_spec_final <- recipe_spec_timeseries |>
+  step_rm(Month) |>
+  step_rm(contains("iso"), 
+          contains("second"), contains("minute"), contains("hour"),
+          contains("am.pm"), contains("xts")) |>
+  step_normalize(contains("index.num"), Month_year) |>
+  #step_interact(~ date_month.lbl * date_day) |>
+  #step_interact(~ date_month.lbl * date_mweek) |>
+  #step_interact(~ date_month.lbl * date_wday.lbl * date_yday) |>
+  step_dummy(contains("lbl"), one_hot = TRUE) 
+
+bake(prep(recipe_spec_final), new_data = train_tbl)
+
+# 05-building forecasting model with workflows
+# create a model specification
+library(glmnet)
+library(parsnip)
+model_spec_glmnet <- linear_reg(mode = "regression", penalty = 10, mixture = 0.7) |>
+  set_engine("glmnet")
+
+library(workflows)
+# mary up the preprocessing recipe and the model
+workflow_glmnet <- workflow() |>
+  add_recipe(recipe_spec_final) |>
+  add_model(model_spec_glmnet)
+
+workflow_glmnet
+
+# training the model
+workflow_trained <- workflow_glmnet |>
+  fit(data = train_tbl)
+
+# using test set for validation
+prediction_tbl <- workflow_trained |> 
+  predict(test_tbl) |>
+  bind_cols(test_tbl) 
+
+prediction_tbl
+
+# Visualize the results
+
+monthly_retail_tbl |>
+  filter(Industry == Industries[1]) |>
+  ggplot(aes(x = Month, y = Turnover)) +
+  geom_rect(xmin = as.numeric(ymd("2010-07-01")),
+            xmax = as.numeric(ymd("2019-01-01")),
+            ymin = 0, ymax = 50,
+            fill = palette_light()[[4]], alpha = 0.01) +
+  annotate("text", x = ymd("1990-04-01"), y = 30,
+           color = palette_light()[[1]], label = "Train Region") +
+  annotate("text", x = ymd("2014-07-01"), y = 20,
+           color = palette_light()[[1]], label = "Test Region") +
+  geom_point(alpha = 0.5, color = palette_light()[[1]]) +
+  
+  # Add predictions
+  geom_point(aes(x = Month, y = .pred), data = prediction_tbl, 
+             alpha = 0.5, color = palette_light()[[2]]) +
+  theme_tq() +
+  labs(title = "GLM: Sample Forecast")
+
+# Calculating forecast error
+library(yardstick)
+prediction_tbl |> metrics(Turnover, .pred)
+
+# visualize the residuals of test set
+prediction_tbl |>
+  ggplot(aes(x = Month, y = Turnover - .pred)) +
+  geom_hline(yintercept = 0, color = "black") +
+  geom_point(color = palette_light()[[1]], alpha = 0.5) +
+  geom_smooth(span = 0.05, color = "red") +
+  geom_smooth(span = 1.00, se = FALSE) +
+  theme_tq() +
+  labs(title = "GLM Model Residuals", x = "") +
+  scale_y_continuous(limits = c(-50, 50))
+
+# 06-Forecasting Future Data
+
+# Extract bikes index
+idx <- monthly_retail_tbl |> tk_index()
+
+# Get time series summary from index
+summary <- idx |> tk_get_timeseries_summary()
+summary[1:6] # general summary information
+summary[7:12] # the periodicity information
+
+idx_future <- idx |> tk_make_future_timeseries(length_out = 300)
+
+future_tbl <- tibble(Month = idx_future) 
+
+future_tbl
+
+# predict the next 10-months
+future_predictions_tbl <- workflow_glmnet |> 
+  fit(data = monthly_retail_tbl) |>
+  predict(future_tbl) |>
+  bind_cols(future_tbl)
+
+# Visualize the forecast
+monthly_retail_tbl |>
+  ggplot(aes(x = Month, y = Turnover)) +
+  geom_rect(xmin = as.numeric(ymd("2010-07-01")),
+            xmax = as.numeric(ymd("2019-01-01")),
+            ymin = 0, ymax = 50,
+            fill = palette_light()[[4]], alpha = 0.01) +
+  geom_rect(xmin = as.numeric(ymd("2010-01-01")),
+            xmax = as.numeric(ymd("2013-07-01")),
+            ymin = 0, ymax = 50,
+            fill = palette_light()[[3]], alpha = 0.01) +
+  annotate("text", x = ymd("2011-10-01"), y = 30,
+           color = palette_light()[[1]], label = "Train Region") +
+  annotate("text", x = ymd("2012-10-01"), y = 50,
+           color = palette_light()[[1]], label = "Test Region") +
+  annotate("text", x = ymd("2013-4-01"), y = 50,
+           color = palette_light()[[1]], label = "Forecast Region") +
+  geom_point(alpha = 0.5, color = palette_light()[[1]]) +
+  # future data
+  geom_point(aes(x = Month, y = .pred), data = future_predictions_tbl,
+             alpha = 0.5, color = palette_light()[[2]]) +
+  geom_smooth(aes(x = Month, y = .pred), data = future_predictions_tbl,
+              method = 'loess') + 
+  labs(title = "10-Month Forecast", x = "") +
+  theme_tq()
