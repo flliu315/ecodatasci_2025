@@ -488,7 +488,7 @@ monthly_retail_tbl |>
   annotate("text", x = ymd("2013-4-01"), y = 50,
            color = palette_light()[[1]], label = "Forecast Region") +
   geom_point(alpha = 0.5, color = palette_light()[[1]]) +
-  # future data
+  # fprecasting with future data
   geom_point(aes(x = Month, y = .pred), data = future_predictions_tbl,
              alpha = 0.5, color = palette_light()[[2]]) +
   geom_smooth(aes(x = Month, y = .pred), data = future_predictions_tbl,
