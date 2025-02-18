@@ -132,8 +132,9 @@ anomalizes |> # Anomalies Cleaned Plot
                          .facet_ncol = 2)
 
 
-# C) check regular and seasonal diagnostics 
-
+# C) check regular/seasonal/stl diagnostics 
+# check the regularity of all time series
+# https://www.r-bloggers.com/2021/12/time-series-forecasting-lab-part-1-introduction-to-feature-engineering/
 monthly_retail_tbl |> # the regularity of ts by checking scale 
   group_by(Industry) |>
   tk_summary_diagnostics(.date_var = Month)
@@ -150,24 +151,21 @@ monthly_retail_tbl |>
                             .title = Industries[1],
                             .interactive = FALSE)
 
-# D) perform ACF and PACF diagnostics 
-# https://www.kaggle.com/code/janiobachmann/time-series-ii-feature-engineering-concepts
+# STL Diagnostics
+# https://www.business-science.io/code-tools/2020/08/26/five-minute-time-series-seasonality.html
+monthly_retail_tbl |> 
+  filter(Industry == Industries[1]) |>
+  plot_stl_diagnostics(
+    Month, Turnover,
+    .frequency = "auto", .trend = "auto",
+    .feature_set = c("observed", "season", "trend", "remainder"),
+    .interactive = FALSE)
 
-color_pal <- c("#5C5C5C", "#EA3B46")
-monthly_retail_tbl |>
-  tk_acf_diagnostics(
-    .date_var = Month,
-    .value = Turnover
-  ) |> 
-  pivot_longer(cols = c("ACF", "PACF")) |> 
-  ggplot(aes(x=lag, y=value, color=name)) + 
-  geom_line(size=1) + 
-  geom_point(size=0.5) +
-  facet_wrap(~name) + 
-  theme_bw() + 
-  scale_color_manual(values = color_pal) +
-  theme(legend.position = "bottom", strip.background =element_rect(fill="#BDBDBD")) + 
-  labs(
-    title = "Autocorrelation and Partial Auto Correlation",
-    color = "Metric"
-  )
+# D) perform ACF and PACF diagnostics 
+# https://www.business-science.io/code-tools/2020/06/17/five-minute-time-series-part-2.html
+
+monthly_retail_tbl |> 
+  filter(Industry == Industries[1]) |>
+plot_acf_diagnostics(Month, Turnover, 
+                     # .lags = 440,
+                     .interactive = FALSE)
