@@ -13,151 +13,71 @@
 cat("\014") # Clears the console
 rm(list = ls()) # Remove all variables
 
-# 01- Econetwork graph representation and visualization
-# https://dshizuka.github.io/networkanalysis/02_dataformats.html
-
-# A) Edegelists and visualization
-
-# install.packages("igraph")
-# 
-# library(RCurl) # if refused, revise dns in /etc/resolv.conf
-# x <- getURL("https://raw.githubusercontent.com/mlurgi/networks_for_r/master/datasets/benguela.edgelist")
-# benguela.EL <- read.table(text = x) 
-# head(benguela.EL)
-# class(benguela.EL)
-# benguela.EL <- as.matrix(benguela.EL)
-# head(benguela.EL)
-# # Create an adjacency matrix called benguela.AM, containing only zeros
-# benguela.AM <- matrix(0, max(benguela.EL), max(benguela.EL))
-# 
-# # Introduce ones to the matrix to represent interactions between species
-# benguela.AM[benguela.EL] <- 1
-# 
-# # Species and interactions
-# 
-# # species richness
-# S <- dim(benguela.AM)[1] # the row
-# 
-# # number of links
-# L <- sum(benguela.AM)
-# 
-# # B) incidence matrix represent bipartite networks
-# library(RCurl)
-# y <- getURL("https://raw.githubusercontent.com/seblun/networks_datacamp/master/datasets/anemonefish.txt")
-# anemonef <- read.table(text = y)
-# names(anemonef) <- paste("A", 1:10, sep = "")
-# row.names(anemonef) <- paste("F", 1:26, sep = "")       
-# anemonef <- as.matrix(anemonef)
-# 
-# ### The number of fish species in the network
-# n_fish <- dim(anemonef)[1] # the row
-# ### The number of anemone species is the number of columns
-# n_anemone <- dim(anemonef)[2] # the column
-# 
-# ### So, the total number of species is the sum of these two quantities
-# S <- n_fish + n_anemone
-# 
-# ### Whereas the total number of interactions is still the sum of the matrix
-# L <- sum(anemonef)
-
 ###############################################################
-# # creating a spreadsheet or edgelist
+# 01- Econetwork graph representation and visualization
+# # As the format of a spreadsheet or edgelist
 # 
-# Source <- c("1","1","2","2","3","4","4","5")
-# Target <- c("2","4","3","4","4","5","6","6")
-# weight <- c("0.1","0.5","0.8","0.2","0.4","0.9","1.0","0.5")
-# 
+from <- c("1","1","2","2","3","4","4","5")
+to <- c("2","4","3","4","4","5","6","6")
+weight <- c(0.1,0.5,0.8,0.2,0.4,0.9,1.0,0.5)
+
 # # Join the variables to create a data frame
-# links <- data.frame(Source,Target,weight)
-# write.csv(links, "data/NETdata/links.csv", row.names = F)
+links <- data.frame(from, to, weight)
+
+# write.csv(links, "data/net_data/edgelist.csv", row.names = F)
 
 # import a edgelist (regular spreedsheet)
 
-vv_EL <- read.csv("data/NETdata/vv.txt", sep = " ")
-vv_EL
+edgelist <- readr::read_csv("data/net_data/edgelist.csv")
+edgelist
 library(dplyr) 
-glimpse(vv_EL)
+glimpse(edgelist)
 
 # visualization with igraph package
 
 library(igraph)
 # Undirected Graph
-vv_EL_g <- graph_from_data_frame(d = vv_EL, directed = F)
-is_weighted(vv_EL_g)
+edgelist_g <- graph_from_data_frame(d = edgelist, directed = F)
+is_weighted(edgelist_g)
 
 set.seed(3523) # Set random seed to ensure graph layout stays
-plot(vv_EL_g, edge.width = E(vv_EL_g)$weight)
+# plot(edgelist_g, edge.width = E(edgelist_g)$weight)
+tkplot(edgelist_g, edge.width = 1:10)
 
-#-----------------------------------------------------
-# visualization with ggraph package
-library(ggraph)
-vv_EL |> 
-  graph_from_data_frame() |>
-  ggraph(layout = "fr") +
-  geom_edge_link(alpha = .25, aes(width = weight)) +
-  geom_node_point(color = "blue", size = 2) + 
-  geom_node_text(aes(label = name),  repel = TRUE)+
-  theme_graph()+
-  labs(title = 'Graph with weighted edges')
 
-#-------------------------------------------------------
+# B) As the format of an adjacency matrix
+library(networkR)
 
-# B) convert to adjacency and visualization
+from <- c("1","1","2","2","3","4","4","5")
+to <- c("2","4","3","4","4","5","6","6")
+weight <- c(0.1,0.5,0.8,0.2,0.4,0.9,1.0,0.5)
 
-# 1) directly derived from an edgelist
+adj_mat <- adjacency(from, to, weight)
+adj_mat[1:6, 1:6]
 
-# first convert to a matrix
-vv_M <- as.matrix(vv_EL[,-3])
-# create an adjacency matrix with only zeros
-vv_AM <- matrix(0, max(vv_M), max(vv_M))
-# add ones to AM to represent interactions
-vv_AM[vv_M] <- 1
-
-# create a graph object
-vv_AM_g <- graph_from_adjacency_matrix(vv_AM,
+adj_mat_g <- graph_from_adjacency_matrix(adj_mat,
                                        weighted=T,
                                        mode="undirected", 
                                        diag=F)
 
-plot(vv_AM_g) # plot without edge weights
-plot(vv_AM_g, # plot with edge weights
-     edge.width = E(vv_EL_g)$weight) 
-##---------------------------------------------------------
-# visualization with ggraph package
-
-vv_AM_g <- vv_AM |>
-  ggraph(layout = "fr") +
-  geom_edge_link(alpha = .25, aes(width = vv_EL$weight)) +
-  geom_node_point(color = "blue", size = 2) + 
-  theme_graph()+
-  labs(title = 'Graph with weighted edges')
-plot(vv_AM_g)
-
-# 2) from the IG graph object
-
-vv_mat <- as_adjacency_matrix(vv_EL_g, sparse=T)
-
-# build the graph object
-vv_mat_g <- graph_from_adjacency_matrix(vv_mat,
-                                        weighted=T,
-                                        mode="undirected", 
-                                        diag=F)
-
-# plot it
-plot(vv_mat_g,
-     edge.width = E(vv_EL_g)$weight)
+plot(adj_mat_g) # plot without edge weights
+plot(adj_mat_g, # plot with edge weights
+     edge.width = E(adj_mat_g)$weight) 
 
 ##--------------------------------------------------------
-# C) Convert to incidence matrix FOR bipartite matrices
+# C) Convert to incidence matrix for bipartite matrices
 # https://rpubs.com/lgadar/load-bipartite-graph
 
-vv1_EL <- read.csv("data/NETdata/vv.txt", sep = " ")
-vv1_EL
-vv1_EL$V1 <- LETTERS[vv1_EL$V1] 
+edgelist <- readr::read_csv("data/net_data/edgelist.csv")
+class(edgelist)
+edgelist_g <- graph_from_data_frame(edgelist)
+is_bipartite(edgelist_g)
 
-library(igraph)
-# create a graph ( UNW, 10 = # of vertex, 8 = # of edges)
-vv1_EL_g <- graph.data.frame(vv1_EL, directed=FALSE)
+library(netdiffuseR)
+inc_mat <- edgelist_to_adjmat(edgelist[,-3], undirected = TRUE)
+inc_mat_g <- graph.incidence(inc_mat, weighted = TRUE)
+is.bipartite(inc_mat_g)
+plot(inc_mat_g, layout = layout_as_bipartite)
 
 #################################################
 # 02- Econetwork databases and data retrieve
