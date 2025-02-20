@@ -53,11 +53,13 @@ to <- c("2","4","3","4","4","5","6","6")
 weight <- c(0.1,0.5,0.8,0.2,0.4,0.9,1.0,0.5)
 
 adj_mat <- adjacency(from, to, weight)
-adj_mat[1:6, 1:6]
+rownames(adj_mat) <- 1:6
+colnames(adj_mat) <- 1:6
+adj_mat
 
 adj_mat_g <- graph_from_adjacency_matrix(adj_mat,
                                        weighted=T,
-                                       mode="undirected", 
+                                       mode="max", 
                                        diag=F)
 
 plot(adj_mat_g) # plot without edge weights
@@ -67,57 +69,67 @@ plot(adj_mat_g, # plot with edge weights
 # C) Convert to incidence matrix for bipartite matrices
 # https://rpubs.com/lgadar/load-bipartite-graph
 
-edgelist <- readr::read_csv("data/net_data/edgelist.csv")
-class(edgelist)
-edgelist_g <- graph_from_data_frame(edgelist)
-is_bipartite(edgelist_g)
+# Load packages
+library(igraph)
+
+weight <- c(0.1,0.5,0.8,0.9,0,0,1.0,0.5,0.0)
+mat <- matrix(weight, byrow = T, nrow = 3, ncol = 3)
+
+rownames(mat) <- c("1","3","4")
+colnames(mat) <- c("2","5","6")
 
 library(netdiffuseR)
-inc_mat <- edgelist_to_adjmat(edgelist[,-3], undirected = TRUE)
-inc_mat_g <- graph.incidence(inc_mat, weighted = TRUE)
-is.bipartite(inc_mat_g)
-plot(inc_mat_g, layout = layout_as_bipartite)
+inc_mat_g <- graph.incidence(mat, weighted = T)
+inc_mat_g
 
-# 02-network property and exploratory analysis
+V(inc_mat_g)$type
+V(inc_mat_g)$name
+
+# Graph from matrix
+plot(inc_mat_g, vertex.size=30, edge.color="gray30",edge.width = 1:10, layout=layout_as_bipartite)
+
+#########################################################
+# 02-molecular network construction and visualization
 # https://github.com/YongxinLiu/Note/blob/master/R/igraph/co-occurrence_network.R
 
 # load 16s RNA sequencing data (otu)
-otu_warming <- read.table("data/net_data/otu_warming.txt", 
+otu_warming <- read.table("data/net_data/warming.txt", 
                           head=T, row.names = 1, sep = "\t")
 head(otu_warming)
-dim(otu_warming) # check dataframe
+dim(otu_warming) 
 sum(!is.na(otu_warming)) 
 
-otu_control <- read.table("data/NETdata/Control.txt", head=T, 
-                          row.names = 1, sep = "\t")
+otu_control <- read.table("data/net_data/control.txt", 
+                          head=T, row.names = 1, sep = "\t")
+head(otu_control)
+dim(otu_control)
 sum(!is.na(otu_control))
 
-# remove the OUTs with less than 7 replicates in 14 plots
+# keep the rows or otus with < 7 NA in the total of 14 plots
 ### for warming plots
-otu_warming_NA <- apply(otu_warming, 
-                        1, # the manipluation on rows
-                        function(z) sum(is.na(z)))
+na_counts_warming <- apply(otu_warming, 1,function(z) sum(is.na(z)))
+length(na_counts_warming)
+
 # delete the OUTs 
-otu_warming_clean <- otu_warming[otu_warming_NA < 7,]
+otu_warming_clean <- otu_warming[na_counts_warming < 7,]
 head(otu_warming_clean)
 dim(otu_warming_clean)
 
 ### for control plots
 
-otu_control_NA <- apply(otu_control, 1, 
-                        function(z) sum(is.na(z)))
-otu_control_clean <- otu_control[otu_control_NA < 7,]
+na_counts_control <- apply(otu_control, 1, function(z) sum(is.na(z)))
+otu_control_clean <- otu_control[na_counts_control< 7,]
 dim(otu_control_clean)
 
-# relative abundance of each OTU in each plot
+# calculating the relative abundance of each OTU in each plot
 ### for warming plots
 
 otu_warming_clean_transform <- otu_warming_clean |>
   replace(is.na(otu_warming_clean), 0) |> # replace NA with 0's value
-  t() # transfer to form samples x OUTS table
+  t() # transfer from outs x plot to the  plot x otus table
 
 otu_warming_rel <- prop.table(as.matrix(otu_warming_clean_transform), 
-                              margin = 1)*100 # each OTU relative abund
+                              margin = 1)*100 # each OTU relative abundance in each plot
 head(otu_warming_rel)
 
 ### for control plots
@@ -139,7 +151,7 @@ otu_warming_corr <- corr.test(otu_warming_rel, use = "pairwise",
                               alpha = 0.05)
 otu_warming_r <- otu_warming_corr$r # extracting r values
 otu_warming_p <- otu_warming_corr$p # extracting p valutes
-otu_warming_r[otu_warming_p >0.5 | abs(otu_warming_r)<0.70] <-0
+otu_warming_r[otu_warming_p > 0.5 | abs(otu_warming_r) < 0.70] <-0
 
 otu_warming_r
 
@@ -158,6 +170,7 @@ otu_control_r
 
 ###### for warming plots ##########
 library(igraph)
+class(otu_warming_r)
 otu_warming_g <- graph_from_adjacency_matrix(otu_warming_r,
                                              mode = "undirected",
                                              weighted = TRUE,
@@ -166,7 +179,7 @@ plot(otu_warming_g)
 
 otu_warming_isol_vertex <- 
   V(otu_warming_g)[igraph::degree(otu_warming_g) == 0] # isolated vertices
-otu_warming_g_optimal <- igraph::delete.vertices(otu_warming_g, 
+otu_warming_g_optimal <- igraph::delete_vertices(otu_warming_g, 
                                                  otu_warming_isol_vertex)
 
 set.seed(123)
@@ -178,7 +191,8 @@ plot(otu_warming_g_optimal, main ="co-occurrence network",
      edge.lty =1,
      edge.curved =TRUE)
 
-write_graph(otu_warming_g_optimal, "data/NETdata/otu_warming_net.txt", "edgelist")
+write_graph(otu_warming_g_optimal, "results/otu_warming_net.txt", "edgelist")
+# warming_g <- read_graph(file = "results/otu_warming_net.txt",format = "edgelist",directed=F)
 
 ####### for control plots ##############
 
@@ -202,15 +216,14 @@ plot(otu_control_g_optimal, main ="co-occurrence network",
      edge.lty =1,
      edge.curved =TRUE)
 
-write_graph(otu_control_g_optimal, "data/NETdata/otu_control_net.txt", "edgelist")
+write_graph(otu_control_g_optimal, "results/otu_control_net.txt", "edgelist")
 
 ################################################################
 
-# 04-network properties and exploratory analysis
+# 03-network properties and exploratory analysis
 
 # 1) unipartite or one-mode network
 
-# Node level properties
 
 # A) degree and degree distribution
 
