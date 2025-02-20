@@ -64,7 +64,6 @@ plot(adj_mat_g) # plot without edge weights
 plot(adj_mat_g, # plot with edge weights
      edge.width = E(adj_mat_g)$weight) 
 
-##--------------------------------------------------------
 # C) Convert to incidence matrix for bipartite matrices
 # https://rpubs.com/lgadar/load-bipartite-graph
 
@@ -79,120 +78,12 @@ inc_mat_g <- graph.incidence(inc_mat, weighted = TRUE)
 is.bipartite(inc_mat_g)
 plot(inc_mat_g, layout = layout_as_bipartite)
 
-#################################################
-# 02- Econetwork databases and data retrieve
-# A) Retrieve data from MANGAL database
-
-# remotes::install_github("ropensci/rmangal")
-library("rmangal")
-
-mgs <- search_datasets(query="fishes") # search
-mgn <- get_collection(mgs) # get database
-names(mgn[[1]]) # check one database
-mgn[[1]]
-
-glimpse(mgn[[1]]$nodes) # check species
-NODES <- mgn[[1]]$nodes # import 
-head(NODES)
-write.csv(NODES, "data/NETdata/NODES.csv") # save edges
-
-glimpse(mgn[[1]]$interactions) # check edges
-EDGES <- mgn[[1]]$interactions # import 
-head(EDGES)
-write.csv(EDGES, "data/NETdata/EDGES.csv") # save edges
-
-nodes <- read.csv("data/NETdata/NODES.csv",  #import notes
-                  header = TRUE, as.is = T)
-names(nodes)
-new_nodes <- nodes[, -1]
-names(new_nodes)[1] <- "id"
-
-links <- read.csv("data/NETdata/EDGES.csv",
-                  header = TRUE, as.is = T)
-names(links)
-new_links <- links[,-c(1,2)] # keep edge list in the first two columns
-names(new_links)[c(1,2)] <- c("from", "to")
-names(new_links)
-
-net <- graph_from_data_frame(d = new_links, # d: dataframe
-                             vertices = new_nodes,
-                             directed = T)
-
-plot(net)
-
-library(igraph)
-ig <- as.igraph(mgn[[1]])
-ig
-plot(ig)
-
-library(tidygraph)
-tg <- as_tbl_graph(mgn[[1]])
-plot(tg)
-
-# B) Retrieve data from weboflife database
-# https://ieubascomptelab01.uzh.ch/bio365-fs22/session-03-17.html#compute-the-connectance-from-an-edge-list
-
-# 1) Download one network from the weboflife API
-# define the base url
-base_url <- "https://www.web-of-life.es/"     
-# define the full url associated with the endpoint that download networks interactions
-json_url <- paste0(base_url,"get_networks.php?network_name=M_SD_002")
-# import the jsonlite package 
-library(rjson) 
-SD_002_nw <- jsonlite::fromJSON(json_url)
-
-# check the class 
-class(SD_002_nw)
-
-# have a look at the dataframe
-head(SD_002_nw)
-
-library(formattable)
-# visualize the dataframe 
-formattable(head(SD_002_nw)) 
-
-# 2) Download multiple networks from the weboflife API
-
-json_url <- paste0(base_url,"get_networks.php") 
-all_nws <- jsonlite::fromJSON(json_url)
-formattable(head(all_nws))
-
-all_nw_names <- distinct(all_nws, network_name)
-
-formattable(head(all_nws))
-
-# Networks can be filtered by interaction type and data type
-json_url <- paste0(base_url,"get_networks.php?interaction_type=Pollination") 
-pol_nws <- jsonlite::fromJSON(json_url)
-
-json_url <- paste0(base_url,"get_networks.php?interaction_type=Pollination&data_type=weighted") 
-pol_weighted_nws <- jsonlite::fromJSON(json_url)
-
-# 3) Download network metadata from the weboflife API
-
-#  obtain information about species in a given network
-
-# define the base url
-base_url <- "https://www.web-of-life.es/"     
-# download dataframe 
-M_PL_073_info <- read.csv(paste0(base_url,"get_species_info.php?network_name=M_PL_073"))
-# show results 
-head(M_PL_073_info) # %>% formattable()
-
-# obtain a csv file with the metadata of all the networks
-
-all_nw_info <- read.csv(paste0(base_url,"get_network_info.php"))
-
-# see what information is provided 
-colnames(all_nw_info)
-
-########################################################
-# 03-molecular network construction and visualization
-# refer to https://github.com/YongxinLiu/Note/blob/master/R/igraph/co-occurrence_network.R
+# 02-network property and exploratory analysis
+# https://github.com/YongxinLiu/Note/blob/master/R/igraph/co-occurrence_network.R
 
 # load 16s RNA sequencing data (otu)
-otu_warming <- read.table("data/NETdata/warming.txt", head=T, 
-                          row.names = 1, sep = "\t")
+otu_warming <- read.table("data/net_data/otu_warming.txt", 
+                          head=T, row.names = 1, sep = "\t")
 head(otu_warming)
 dim(otu_warming) # check dataframe
 sum(!is.na(otu_warming)) 
