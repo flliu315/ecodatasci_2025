@@ -223,6 +223,31 @@ write_graph(otu_control_g_optimal, "results/otu_control_net.txt", "edgelist")
 # 03-network properties and exploratory analysis
 
 # 1) unipartite or one-mode network
+# (1)) Network level properties
+
+# A)  connectance
+# https://bookdown.org/creakysinger/r-note-learn/_book/Nchpter20.html
+library(igraph)
+g<-read_graph("results/otu_warming_net.txt","edgelist")
+g <- as.undirected(g, mode = "collapse")
+plot(g,vertex.frame.color=NA,vertex.label=NA,edge.width=1,
+     vertex.size=5,edge.lty=1,edge.curved=F)
+connectance = edge_density(g,loops=FALSE) # connectance
+connectance
+
+# B) modularity
+# https://biosakshat.github.io/network-analysis.html
+library(igraph)
+g<-read_graph("results/otu_warming_net.txt","edgelist")
+g <- as.undirected(g, mode = "collapse")
+ceb <- cluster_edge_betweenness(g)
+modularity(ceb)
+plot(ceb, g)
+
+# C) nestedness
+
+# (2) Node level perporties
+
 # A) degree and degree distribution
 
 library(igraph)
@@ -268,44 +293,20 @@ cc_global
 cc_local <- igraph::transitivity(g, type = "local")
 cc_local
 
-# Network level properties
-
-# A) connectance
-# https://bookdown.org/creakysinger/r-note-learn/_book/Nchpter20.html
-library(igraph)
-g<-read_graph("results/otu_warming_net.txt","edgelist")
-g <- as.undirected(g, mode = "collapse")
-plot(g,vertex.frame.color=NA,vertex.label=NA,edge.width=1,
-     vertex.size=5,edge.lty=1,edge.curved=F)
-connectance = edge_density(g,loops=FALSE) # connectance
-connectance
-
-# B) modularity
-# https://biosakshat.github.io/network-analysis.html
-library(igraph)
-g<-read_graph("results/otu_warming_net.txt","edgelist")
-g <- as.undirected(g, mode = "collapse")
-ceb <- cluster_edge_betweenness(g)
-modularity(ceb)
-plot(ceb, g)
-
-# C) nestedness
-
-
 ##----------------------------------------------------------
 ## 2) bipartite or two-mode network 
 
 # https://rpubs.com/pjmurphy/317838
-vv1_EL <- read.csv("data/NETdata/vv.txt", sep = " ")
+vv1_EL <- read.csv("data/net_data/vv.txt", sep = " ")
 vv1_EL
 vv1_EL$V1 <- LETTERS[vv1_EL$V1] 
 
 library(igraph)
 # create a graph ( UNW, 10 = # of vertex, 8 = # of edges)
-vv1_EL_g <- graph.data.frame(vv1_EL, directed=FALSE)
+vv1_EL_g <- graph_from_data_frame(vv1_EL, directed=FALSE)
 
 # identify two-mode network by $res=T and $type = F or T 
-bipartite.mapping(vv1_EL_g)
+bipartite_mapping(vv1_EL_g)
 
 ## Add the "type" attribute to the network
 V(vv1_EL_g)$type <- bipartite_mapping(vv1_EL_g)$type  
@@ -338,16 +339,11 @@ vv_clos <- igraph::closeness(vv1_EL_g)
 vv_cent_df <- data.frame(vv_types, vv_deg, vv_bet, vv_clos)
 vv_cent_df[order(vv_cent_df$vv_types, decreasing = TRUE),] 
 
-
 ########################################################
-# 05-link predition with Keras in rstudio
-
-library(keras)
-library(igraph)
-library(dplyr)
+# 04-link predition with ML
 
 # load the MEN graph
-g <- read_graph("data/NETdata/otu_warming_net.txt","edgelist")
+g <- read_graph("results/otu_warming_net.txt","edgelist")
 g <- as.undirected(g, mode = "collapse")
 
 # Get the node IDs
@@ -363,13 +359,13 @@ plot(g,
      edge.curved=F)
 
 # Get positive samples (existing edges)
-positive_edges <- as_data_frame(g, what = "edges")
+positive_edges <-  igraph::as_data_frame(g, what = "edges")
 colnames(positive_edges) <- c("from", "to")
 positive_edges$label <- 1
 
 # Generate negative samples (non-existing edges)
 possible_edges <- t(combn(V(g), 2))
-existing_edges <- get.edgelist(g)
+existing_edges <- as_edgelist(g)
 existing_edges <- apply(existing_edges, 1, 
                         function(x) paste(sort(x), collapse = "-"))
 possible_edges <- apply(possible_edges, 1, 
@@ -434,4 +430,4 @@ pred <- data.frame(ids = as.integer(node_ids),
                    links = as.integer(predictions))
 head(pred)
 sum(pred$links == 1)
-write_csv(pred, "data/NETdata/pred.csv")
+readr::write_csv(pred, "results/link_pred.csv")
