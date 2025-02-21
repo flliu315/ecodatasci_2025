@@ -223,12 +223,10 @@ write_graph(otu_control_g_optimal, "results/otu_control_net.txt", "edgelist")
 # 03-network properties and exploratory analysis
 
 # 1) unipartite or one-mode network
-
-
 # A) degree and degree distribution
 
 library(igraph)
-g <-read_graph("data/NETdata/otu_warming_net.txt","edgelist") 
+g <-read_graph("results/otu_warming_net.txt","edgelist") 
 g <- as.undirected(g, mode = "collapse")
 plot(g,vertex.frame.color=NA,vertex.label=NA,edge.width=1,
      vertex.size=5,edge.lty=1,edge.curved=F)
@@ -273,19 +271,19 @@ cc_local
 # Network level properties
 
 # A) connectance
-
+# https://bookdown.org/creakysinger/r-note-learn/_book/Nchpter20.html
 library(igraph)
-g<-read_graph("data/NETdata/otu_warming_net.txt","edgelist")
+g<-read_graph("results/otu_warming_net.txt","edgelist")
 g <- as.undirected(g, mode = "collapse")
 plot(g,vertex.frame.color=NA,vertex.label=NA,edge.width=1,
      vertex.size=5,edge.lty=1,edge.curved=F)
-connectance = edge_density(g,loops=FALSE)# connectance
+connectance = edge_density(g,loops=FALSE) # connectance
 connectance
 
 # B) modularity
-
+# https://biosakshat.github.io/network-analysis.html
 library(igraph)
-g<-read_graph("data/NETdata/otu_warming_net.txt","edgelist")
+g<-read_graph("results/otu_warming_net.txt","edgelist")
 g <- as.undirected(g, mode = "collapse")
 ceb <- cluster_edge_betweenness(g)
 modularity(ceb)
