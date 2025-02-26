@@ -342,6 +342,58 @@ vv_cent_df[order(vv_cent_df$vv_types, decreasing = TRUE),]
 ########################################################
 # 04-link predition with ML
 
+library(igraph)
+library(dplyr)
+
+library(tidygraph)
+library(dplyr)
+
+# Create a graph (same as before)
+g <- graph_from_data_frame(d = data.frame(from = c("A", "A", "B", "C"), 
+                                          to = c("B", "C", "D", "D")), 
+                           directed = FALSE)
+
+# Convert the graph from igraph to tidygraph
+g_tidy <- as_tbl_graph(g)
+
+# Convert the graph's edges into a data frame
+edges_df <- as_tibble(g_tidy, what = "edges")
+
+# Define the function to find possible edges using tidygraph
+find_possible_edges <- function(g, edges, seed = 12445) {
+  set.seed(seed)
+  idx <- sample(1:nrow(edges), size = nrow(edges), replace = FALSE)
+  edges <- edges[idx, ]
+  pos_examples_idx <- rep(FALSE, nrow(edges))
+  g_temp <- g
+  
+  for (row in seq_len(nrow(edges))) {
+    # Remove the current edge using anti_join, properly accessing the edge columns
+    g_temp1 <- g_temp %>% 
+      activate(edges) %>% 
+      anti_join(edges[row, ], by = c("from" = "from", "to" = "to"))
+    
+    # Check if the graph is still connected
+    verdict <- graph_is_connected(g_temp1)
+    pos_examples_idx[row] <- verdict
+    
+    # If the graph is still connected, update g_temp
+    if (verdict) { g_temp <- g_temp1 }
+  }
+  
+  message(paste0("Found ", sum(pos_examples_idx), " possible links"))
+  edges[pos_examples_idx, ]
+}
+
+# Run the function
+possible_edges <- find_possible_edges(g_tidy, edges_df)
+print(possible_edges)
+
+
+
+
+
+
 # load the MEN graph
 g <- read_graph("results/otu_warming_net.txt","edgelist")
 g <- as.undirected(g, mode = "collapse")
