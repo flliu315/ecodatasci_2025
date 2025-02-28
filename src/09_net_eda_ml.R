@@ -342,13 +342,14 @@ vv_cent_df[order(vv_cent_df$vv_types, decreasing = TRUE),]
 ########################################################
 # 04-link predition with ML
 
-library(igraph)
-library(dplyr)
 
+# Install and load necessary libraries
+install.packages("tidygraph")
+install.packages("dplyr")
 library(tidygraph)
 library(dplyr)
 
-# Create a graph (same as before)
+# Create a sample graph (same as before)
 g <- graph_from_data_frame(d = data.frame(from = c("A", "A", "B", "C"), 
                                           to = c("B", "C", "D", "D")), 
                            directed = FALSE)
@@ -356,38 +357,42 @@ g <- graph_from_data_frame(d = data.frame(from = c("A", "A", "B", "C"),
 # Convert the graph from igraph to tidygraph
 g_tidy <- as_tbl_graph(g)
 
-# Convert the graph's edges into a data frame
-edges_df <- as_tibble(g_tidy, what = "edges")
-
-# Define the function to find possible edges using tidygraph
-find_possible_edges <- function(g, edges, seed = 12445) {
-  set.seed(seed)
-  idx <- sample(1:nrow(edges), size = nrow(edges), replace = FALSE)
-  edges <- edges[idx, ]
-  pos_examples_idx <- rep(FALSE, nrow(edges))
-  g_temp <- g
+# Define a new function to find possible links (edges that can be safely removed)
+find_possible_links_v2 <- function(g) {
+  # Convert graph edges to tibble for easy access
+  edges_df <- as_tibble(g, what = "edges")
   
-  for (row in seq_len(nrow(edges))) {
-    # Remove the current edge using anti_join, properly accessing the edge columns
-    g_temp1 <- g_temp %>% 
-      activate(edges) %>% 
-      anti_join(edges[row, ], by = c("from" = "from", "to" = "to"))
+  # Initialize an empty list to hold the possible links
+  possible_links <- list()
+  
+  # Loop through each edge in the graph
+  for (i in seq_len(nrow(edges_df))) {
+    # Extract the current edge
+    current_edge <- edges_df[i, ]
     
-    # Check if the graph is still connected
-    verdict <- graph_is_connected(g_temp1)
-    pos_examples_idx[row] <- verdict
+    # Remove the edge from the graph
+    g_temp <- g %>% activate(edges) %>% delete_edges(i)
     
-    # If the graph is still connected, update g_temp
-    if (verdict) { g_temp <- g_temp1 }
+    # Check if the graph is still connected after removing the edge
+    if (is_connected(g_temp)) {
+      # If connected, add the edge to the possible links list
+      possible_links[[length(possible_links) + 1]] <- current_edge
+    }
   }
   
-  message(paste0("Found ", sum(pos_examples_idx), " possible links"))
-  edges[pos_examples_idx, ]
+  # Convert the list of possible links to a tibble and return
+  message(paste0("Found ", length(possible_links), " possible links"))
+  
+  # Combine the list into a tibble with correct column names
+  possible_links_df <- bind_rows(possible_links) %>%
+    select(from, to)  # Ensure the columns are "from" and "to"
+  
+  return(possible_links_df)
 }
 
-# Run the function
-possible_edges <- find_possible_edges(g_tidy, edges_df)
-print(possible_edges)
+# Run the new function
+possible_edges_v2 <- find_possible_links_v2(g_tidy)
+print(possible_edges_v2)
 
 
 
