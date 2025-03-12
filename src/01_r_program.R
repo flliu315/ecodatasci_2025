@@ -265,27 +265,32 @@ help.search("^tidyverse")
 # Data Analysis.R
 vec <- c(1, 2, 3)
 
-# E) Assignment Using <- Not =
+# E) import into R and export using relative path
+
+input_file <- "data/data.csv" 
+output_file <- "data/results.csv"
+
+# F) Assignment Using <- Not =
 # The assignment operator <- is preferred over = for clarity
 # and consistency in R code. Using proper spacing, especially 
 # near operators, enhances code readability
 
 result <- a + b
 
-# F) annotating and marking code using # or #- to set off 
+# G) annotating and marking code using # or #- to set off 
 #  code sections or separate the function definitions. If 
 #  creating only one or a few custom functions in script, 
 #  put them toward the top of code. If many functions, put
 #  them all in their own .R file and source those files
 
-# G) Proper indentation and spacing make code more readable 
+# H) Proper indentation and spacing make code more readable 
 #  and maintainable
 
 # if (condition) {
 #   do_something()
 # }
 
-# H) Pipes are widely used for streamline code by chaining 
+# I) Pipes are widely used for streamline code by chaining 
 #  operations in a readable manner
 
 library(dplyr)
@@ -293,7 +298,7 @@ data %>%
   filter(x > 1) %>%
   summarise(mean_y = mean(y))
 
-# I) using gptstudio for help
+# K) using gptstudio for help
 
 # install.packages("pak")
 pak::pak("usethis")
