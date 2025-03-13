@@ -135,24 +135,6 @@ my_vector <- c(1, 3, 5, 2, 6, 9, 0)
 vector_mean <- myMean(x = my_vector)
 vector_mean
 
-# For loop
-
-my_list <- list(c(1, 5, 9, 3), 1:10, c(23, 42))
-my_averages <- c()
-for(i in c(1, 2, 3)){
-  my_averages[i] <- myMean(my_list[[i]])
-}
-my_averages
-
-# The apply() family
-mtcars <- mtcars[, c("mpg", "drat", "wt")]
-mtcars_max <- apply(mtcars, 
-                    MARGIN = 2, # applying the max() function to each column
-                    FUN = max, 
-                    na.rm = TRUE # na.rm is being passed to the max() function
-)
-mtcars_max
-
 # Creating a function without an argument
 new.function <- function(){
   for(i in 1:5){
@@ -172,9 +154,7 @@ new.function <- function(a){
 # Calling the function supplying arguments
 new.function(10)
 
-source("src/coldiss.R")
-
-# E) Many useful R function come in packages
+# c) Many useful R function come from packages
 
 # finding and selecting packages
 # install.packages("packagefinder", dependencies = TRUE)
@@ -182,29 +162,29 @@ source("src/coldiss.R")
 library(packagefinder)
 findPackage("community ecology") 
 
-# a) from CRAN
+# --from CRAN
 # Install packages by IDE or using install.packages()
 
 # install.packages('readr')
 # install.packages(c('readr', 'ggplot2', 'tidyr'))
 
-# b) from GitHub
+# --from GitHub
 
 # install.packages('devtools')
 # devtools::install_github('rstudio/shiny')
 
-# c) from special Repositories
+# --from special Repositories
 # install.packages('furrr',
 #                  repos='http://cran.us.r-project.org',
 #                  dependencies=TRUE)
 
-# d) from Zip files
+# --from Zip files
 # Installing R Packages from Zip Files by IDE or
 # install.packages('C:/Users/User/Downloads/abc_2.1.zip',
 #                  repos=NULL, type='source')
 
 
-# using pak to install R packages
+# --using pak to install R packages
 
 # first install pak package
 # install.packages("pak")
@@ -216,7 +196,7 @@ findPackage("community ecology")
 # Install packages from github
 # pak::pkg_install("tomwenseleers/export")
 
-# help yourself about using packages
+# d) help yourself about using packages
 
 # Helping yourself
 help(package="tidyverse")
@@ -246,9 +226,11 @@ help.search("^tidyverse")
 #   ├── scripts/
 #   └── results/
 
-# B) Writing R scripts in an editor
-# To start writing a new R script in RStudio, 
+# B) There are two ways to write R codes to generate our
+# analyses, both of which use the Source panel. Writing R
+# scripts in an editor by following the steps:
 # click File – New File – R Script
+
 
 # C) Customizing Snippets for tracking
 # Starting with an annotated description of who write the
@@ -256,41 +238,52 @@ help.search("^tidyverse")
 # look at or change it in the future
 # https://blog.devgenius.io/how-to-automatically-create-headers-in-r-scripts-be69152ac23f
 
-# D) Naming variables and avoiding Reserved Names
-# descriptive names improves readability and avoid using 
-# reserved names such as c, T, or F as variable names to 
-# prevent conflicts with built-in functions and constants
+# D) Assignment Using <- Not =
+# The assignment operator <- is preferred over = for clarity
+# and consistency in R code
 
-# data_analysis.R
-# Data Analysis.R
+ a + b
+
+# E) using descriptive names for naming variables to improve
+# readability and avoid using reserved names such as c, T, or F 
+# as variable names to prevent conflicts with built-in functions
+
 vec <- c(1, 2, 3)
 
-# E) import into R and export using relative path
+# F) Defining a relative path for import files into R and
+# export them out R environment. For example:
 
 input_file <- "data/data.csv" 
 output_file <- "data/results.csv"
 
-# F) Assignment Using <- Not =
-# The assignment operator <- is preferred over = for clarity
-# and consistency in R code. Using proper spacing, especially 
-# near operators, enhances code readability
-
-result <- a + b
-
 # G) annotating and marking code using # or #- to set off 
-#  code sections or separate the function definitions. If 
-#  creating only one or a few custom functions in script, 
+#  code sections or separate the function definitions. 
+
+input_data <- read.csv(input_file) # read input 
+sample_number <- nrow(input_data) # get number of samples 
+results <- some_other_function(input_file, 
+                               sample_number) 
+
+# H) If creating one or a few custom functions in script, 
 #  put them toward the top of code. If many functions, put
 #  them all in their own .R file and source those files
 
-# H) Proper indentation and spacing make code more readable 
+source("src/myMean.R")
+myvector <- c(1, 2, 3)
+myMean(myvector) # from myMean.R
+
+# I) Proper indentation and spacing make code more readable 
 #  and maintainable
 
-# if (condition) {
-#   do_something()
-# }
+mtcars <- mtcars[, c("mpg", "drat", "wt")]
+mtcars_max <- apply(mtcars, 
+                    MARGIN = 2, # applying the max() function to each column
+                    FUN = max, 
+                    na.rm = TRUE # na.rm is being passed to the max() function
+)
+mtcars_max
 
-# I) Pipes are widely used for streamline code by chaining 
+# J) Pipes are widely used for streamline code by chaining 
 #  operations in a readable manner
 
 library(dplyr)
@@ -306,3 +299,26 @@ pak::pak("usethis")
 usethis::edit_r_environ()
 Sys.getenv("OPENAI_API_KEY")
 gptstudio:::gptstudio_chat()
+
+"please write a R function for checking the > 35 elements 
+of the vector consisted of the rnorm(n = 10, mean= 35, sd 
+= 10）using for loop or apply()family. thanks."
+
+check_values_for <- function(n = 10, mean = 35, sd = 10, threshold = 35) {
+  # Generate random vector
+  random_values <- rnorm(n, mean, sd)
+  
+  # Initialize an empty logical vector
+  above_threshold <- logical(n)
+  
+  # Check each value using a for loop
+  for (i in 1:n) {
+    above_threshold[i] <- random_values[i] > threshold
+  }
+  
+  # Return results as a data frame
+  return(data.frame(Value = random_values, Above_Threshold = above_threshold))
+}
+
+# Test the function
+check_values_for()
