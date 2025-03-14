@@ -242,7 +242,7 @@ help.search("^tidyverse")
 # The assignment operator <- is preferred over = for clarity
 # and consistency in R code
 
- a + b
+ x <- 2
 
 # E) using descriptive names for naming variables to improve
 # readability and avoid using reserved names such as c, T, or F 

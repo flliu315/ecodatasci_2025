@@ -190,67 +190,138 @@ dplyr::rename(doubs_env_spe, abund=spe.abund)
 #                                 "doubs_env_spe.shp"))
 
 ########################################################
-# 03-ESDA focusing on SN, SWM, SL and SA beyond EDA
+# 03-ESDA focusing on SN, SWM and SA beyond EDA
 #######################################################
 
-# A) Spatial neighborhood, SWM and Spatial lag
-##------------------------------------------------ 
-# Neighbors based on contiguity (Queen vs Rook)
-# https://www.paulamoraga.com/book-spatial/spatial-neighborhood-matrices.html
+# A) Neighbors based on contiguity (Queen vs Rook)
+
+# a) the global spatial autocorrelation 
+
+# https://bookdown.org/lexcomber/GEOG3195/spatial-models-spatial-autocorrelation-and-cluster-analysis.html
 library(spData)
 library(sf)
 library(spdep)
 library(ggplot2)
+
 map <- st_read(system.file("shapes/columbus.shp",
                            package = "spData"), quiet = TRUE)
 plot(st_geometry(map), border = "lightgray")
 
+map$vble <- map$CRIME # the focusing variable
+# mapview(map, zcol = "vble")
+
+p_vble = # create the map
+  ggplot(map) + 
+  geom_sf(aes(fill = map$vble)) +
+  scale_fill_gradient2(midpoint = 0.5, low = "red", high = "blue") +
+  theme_minimal()
+
+p_vble 
 
 library(spdep)
-nb <- spdep::poly2nb(map, queen = TRUE)
-head(nb)
-lengths(nb)
+nb <- poly2nb(map, queen = TRUE) # determine adjacency 
 
-plot.nb(nb, st_geometry(map), add = TRUE)
-id <- 20 # area id
-map$neighbors <- "other"
-map$neighbors[id] <- "area"
-map$neighbors[nb[[id]]] <- "neighbors"
-ggplot(map) + geom_sf(aes(fill = neighbors)) + theme_bw() +
-  scale_fill_manual(values = c("gray30", "gray", "white"))
+# examine zero links locations
+map$rn = rownames(map) 
+tmap_mode("view")
+tm_shape(map) + 
+  tm_borders() +
+  tm_text(text = "rn") +
+  tm_basemap("OpenStreetMap")
+tmap_mode("plot")
 
-# spatial weights Matrix 
-nb <- poly2nb(map, queen = TRUE)
-nbw <- spdep::nb2listw(nb, style = "W")
+# Create a line layer showing Queen's case contiguities
+gg_net <- nb2lines(nb,coords=st_geometry(st_centroid(map)), 
+                   as_sf = F) 
+# Plot the contiguity and the map layer
+p_adj = 
+  ggplot(map) + geom_sf(fill = NA, lwd = 0.1) + 
+  geom_sf(data = gg_net, col='red', alpha = 0.5, lwd = 0.2) +
+  theme_minimal() + labs(subtitle =  "Adj")
+p_adj
+
+# spatial weights Matrix and the lagged means
+
+nbw <- spdep::nb2listw(nb, style = "W") # compute the weighted list from nb object
 nbw$weights[1:3]
-m1 <- listw2mat(nbw)
-lattice::levelplot(t(m1),
-                   scales = list(y = list(at = c(10, 20, 30, 40),
-                                          labels = c(10, 20, 30, 40))))
-##-----------------------------------------------------
-# distance-based spatial Neighbors, SWM and spatial lag
+map$lagged_means <- lag.listw(nbw, map$vble) # compute the lagged means
+p_lagged = 
+  ggplot(map) + geom_sf(aes(fill = lagged_means)) +
+  scale_fill_gradient2(midpoint = 0.5, low = "red", high = "blue") +
+  theme_minimal()
 
-nb <- dnearneigh(x = st_centroid(map), d1 = 0, d2 = 0.4)
-plot(st_geometry(map), border = "lightgray")
-plot.nb(nb, st_geometry(map), add = TRUE)
+cowplot::plot_grid(p_vble, p_lagged)
 
-# inverse distance values-based SWM
+p_lm = 
+  ggplot(data = map, aes(x = vble, y = lagged_means)) +
+  geom_point(shape = 1, alpha = 0.5) +
+  geom_hline(yintercept = mean(map$lagged_means), lty = 2) +
+  geom_vline(xintercept = mean(map$vble), lty = 2) +
+  geom_abline() +
+  coord_equal()
+p_lm
 
-coo <- st_centroid(map)
-nb <- poly2nb(map, queen = TRUE)
-dists <- nbdists(nb, coo)
-ids <- lapply(dists, function(x){1/x})
+# create Moran plot and statistic test using weighted list
+moran.plot(x = map$vble, listw = nbw, asp = 1)
 
-nbw <- nb2listw(nb, glist = ids, style = "B")
-nbw$weights[1:3]
+moran.test(x = map$vble, listw = nbw) # for Moran’s I for statistic test
 
-m2 <- listw2mat(nbw)
-lattice::levelplot(t(m2), scales = 
-                     list(y = list(at = c(10, 20, 30, 40),
-                              labels = c(10, 20, 30, 40))))
+moran.range <- function(lw) {
+  wmat <- listw2mat(lw)
+  return(range(eigen((wmat + t(wmat))/ 2) $values))
+} 
+
+moran.range(nbw) # strongly clustered
+
+# b) local spatial autocorrelation and clusters
+
+# Compute the local Moran’s I
+map$lI <- localmoran(x = map$vble, listw = nbw)[, 1] 
+
+p_lisa = # create the map
+  ggplot(map) +
+  geom_sf(aes(fill= lI), lwd = 0.1) +
+  scale_fill_gradient2(midpoint = 0, name = "Local\nMoran's I",
+                       high = "darkgreen", low = "white") +
+  theme_minimal()
+p_lisa # print the map
+
+# Create the local p values
+map$pval <- localmoran(map$vble,nbw)[, 5]
+map$pval
+
+p_lisa_pval = 
+  ggplot(map) +
+  geom_sf(aes(fill= pval), lwd = 0.1) +
+  scale_fill_gradient2(midpoint = 0.05, 
+                       name = "p-values", 
+                       high = "red", low = "white") +
+  theme_minimal()
+
+p_lisa_pval # print the map
+
+cowplot::plot_grid(p_lisa + theme(legend.position = "bottom"), 
+          p_lisa_pval + theme(legend.position = "bottom"),
+          ncol = 2)
+
+index  = map$pval <= 0.05
+p_vble + geom_sf(data = map[index,], fill = NA, 
+                 col = "black", lwd = 0.5)
+
+# Getis-Ord G statistic
+
+map$gstat <- as.numeric(localG(map$vble, nbw))
+
+p_geto = 
+  ggplot(map) + 
+  geom_sf(aes(fill = gstat)) + 
+  scale_fill_gradient2(midpoint = 0.5, low = "red", high = "blue", 
+                       name = "G Statistic")+
+  theme_minimal()
+p_geto
 
 ##----------------------------------------------
-# Creating Thiessen polygons from a point layer
+# C) Creating Thiessen polygons from a point layer
 
 library(sf)
 Doubs <- st_read("data/geo_data/doubs_env_spe.shp")
@@ -347,63 +418,6 @@ gg_doubs_obs
 patchwork::wrap_plots(gg_doubs_obs, gg_doubs_lag)
 
 # B) Global and Local spatial autocorrelation, clusters
-##--------------------------------------------------------
-# As for the polygons
-
-# https://www.paulamoraga.com/book-spatial/spatial-autocorrelation.html
-library(spData)
-library(sf)
-library(mapview)
-map <- st_read(system.file("shapes/columbus.shp",
-                           package = "spData"), quiet = TRUE)
-map$vble <- map$CRIME # the focusing variable
-mapview(map, zcol = "vble")
-
-library(spdep)
-nb <- poly2nb(map, queen = TRUE) # queen shares point or border
-nbw <- nb2listw(nb, style = "W")
-
-# Global Moran's I
-gmoran <- moran.test(map$vble, nbw,
-                     alternative = "greater")
-gmoran
-
-# Moran’s scatterplot
-
-moran.plot(map$vble, nbw)
-
-# Local Moran’s I
-lmoran <- localmoran(map$vble, nbw, alternative = "greater")
-head(lmoran)
-
-# identify clusters 
-
-lmoran <- localmoran(map$vble, nbw, alternative = "two.sided")
-head(lmoran)
-
-mp <- moran.plot(as.vector(scale(map$vble)), nbw)
-head(mp)
-
-map$quadrant <- NA
-# high-high
-map[(mp$x >= 0 & mp$wx >= 0) & (map$lmp <= 0.05), "quadrant"]<- 1
-# low-low
-map[(mp$x <= 0 & mp$wx <= 0) & (map$lmp <= 0.05), "quadrant"]<- 2
-# high-low
-map[(mp$x >= 0 & mp$wx <= 0) & (map$lmp <= 0.05), "quadrant"]<- 3
-# low-high
-map[(mp$x <= 0 & mp$wx >= 0) & (map$lmp <= 0.05), "quadrant"]<- 4
-# non-significant
-map[(map$lmp > 0.05), "quadrant"] <- 5
-
-tm_shape(map) + tm_fill(col = "quadrant", title = "",
-                        breaks = c(1, 2, 3, 4, 5, 6),
-                        palette =  c("red", "blue", "lightpink", "skyblue2", "white"),
-                        labels = c("High-High", "Low-Low", "High-Low",
-                                   "Low-High", "Non-significant")) +
-  tm_legend(text.size = 1)  + tm_borders(alpha = 0.5) +
-  tm_layout(frame = FALSE,  title = "Clusters")  +
-  tm_layout(legend.outside = TRUE)
 
 ##-----------------------------------------------------
 ## As for the points
@@ -453,12 +467,12 @@ plot(vtess_sf$geometry)
 # creating the queen contiguity
 
 st_queen <- function(a, b = a) st_relate(a, b, pattern = "F***T****")
-queen.sgbp <- st_queen(vtess.sf)
-class(queen.sgbp)
+queen_sgbp <- st_queen(vtess_sf)
+class(queen_sgbp)
 
 # converts type sgbp to nb
 
-as.nb.sgbp <- function(x, ...) {
+as_nb_sgbp <- function(x, ...) {
   attrs <- attributes(x)
   x <- lapply(x, function(i) { if(length(i) == 0L) 0L else i } )
   attributes(x) <- attrs
@@ -466,18 +480,18 @@ as.nb.sgbp <- function(x, ...) {
   x
 }
 
-queen.nb <- as.nb.sgbp(queen.sgbp)
+queen_nb <- as.nb.sgbp(queen_sgbp)
 
-queen.weights <- nb2listw(queen.nb) # get row standardized weights
+queen_weights <- nb2listw(queen_nb) # get row standardized weights
 
 # Creating a Moran scatter plot
 
 moran <- moran(doubs_sfxy$spe_abund, 
-               queen.weights, length(queen.nb), 
-               Szero(queen.weights))
+               queen_weights, length(queen_nb), 
+               Szero(queen_weights))
 moran$I 
 
-doubs_sfxy$lagged_spe_abund <- lag.listw(queen.weights,
+doubs_sfxy$lagged_spe_abund <- lag.listw(queen_weights,
                                          doubs_sfxy$spe_abund)
 doubs_sfxy$lagged_spe_abund
 
@@ -501,13 +515,13 @@ ggplot(data = doubs_sfxy, aes(x=standardized_spe_abund,
 # test if Moran’s I statistic are statistically significant
 # https://rpubs.com/laubert/SACtutorial
 spe_abund_gI <- moran.test(doubs_sfxy$spe_abund, 
-                           queen.weights, zero.policy = TRUE)
+                           queen_weights, zero.policy = TRUE)
 
 moran.range <- function(lw) {
   wmat <- listw2mat(lw)
   return(range(eigen((wmat + t(wmat))/2)$values))
 }
-moran.range(queen.weights) # min-max=random, otherwise cluster or dispersed
+moran.range(queen_weights) # min-max=random, otherwise cluster or dispersed
 
 #Calculate Z-score
 mI <- spe_abund_gI$estimate[[1]] # global MI
@@ -589,7 +603,7 @@ zscore <- (mI-eI)/var**0.5 # -1.96 <zscore <1.96, no spatial correlation
 # Spatial Correlogram
 # 
 coords <- cbind(doubs_sfxy$x, doubs_sfxy$y)
-dist.band.nb <- dnearneigh(coords,
+dist_band_nb <- dnearneigh(coords,
                            0, 37576.59) # critical.threshold
 sp <- sp.correlogram(dist.band.nb,
                      doubs_sfxy$spe_abund,
