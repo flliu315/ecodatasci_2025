@@ -3,8 +3,6 @@
 # Purpose: This section introduces data types and structures
 #          used in R, and basic data manipulation. The main
 #          websites refereed are
-#          https://www.javatpoint.com/r-database
-#          https://bbolker.github.io/R-ecology-lesson/03-dplyr.html
 #          
 # Author:     Fanglin Liu
 # Email:      flliu315@163.com
@@ -14,171 +12,68 @@
 cat("\014") # Clears the console
 rm(list = ls()) # Remove all variables
 
-###########################################################
-# getwd() # current working directory
-# setwd() # set working directory
+# 01-value or data types
 
-# 01-values and variables 
-# https://sdesabbata.github.io/r-for-geographic-data-science/introduction-to-r.html
+# double, integer, logical, character, datetime
+# https://www.geeksforgeeks.org/r-data-types/
 
-# A) Numeric example
-a_number <- 1.41
+# Double
 
-is.numeric(a_number)
-is.integer(a_number)
-is.double(a_number)
+x <- 5.23
+is.numeric(x)
+is.integer(x)
+is.double(x)
 
-# numeric operators
+# Integer
 
-5+2
-5-2
-5*2
-5/2
-5%/%2 # the integer division
-5%%2 #  the remainder
-5^2
+x <- 5L 
 
-abs(-2) # Absolute value
-ceiling(3.475) # Upper round
-floor(3.475) # Lower round
-trunc(5.99) # the decimal portion
-round(5.99, digits=1) #  the nearest integer
+# Logical
 
-0 / 0
-is.nan(0 / 0)
+x <- c(TRUE, TRUE, FALSE)
 
-# Logical operators
+# Character
 
-5==2
-first_value <- 5
-second_value <- 2
-first_value == 5
-first_value == 2
-second_value == 5
-second_value == 2
-first_value == second_value
+x <- "elevated"
+is.character(x)
+is.numeric(x)
 
+# Datetime
 
-# Character example
-"String value" 
-is.character("String value" )
-is.numeric("String value")
+x <- Sys.time()
 
-# B) variable or object
+# 02-creating objects and assigning variables
+# https://www.geeksforgeeks.org/r-objects/
 
-a_variable <- 1.41 # Assignment a value
-a_variable            
+# R objects include vectors, list, dataframe, matrix, array
+# Create vectors 
 
-is.numeric(a_variable)
+c(1,4,7)
+Num_variable <- c(1,4,7) # assign this to a variable for future use
 
-a_variable <- "Hello world!"
-a_variable
+# Create list 
+ls <- list(c(1, 2, 3, 4), list("a", "b", "c")) 
 
-is.character(a_variable)
+# Create matrix 
+x <- c(1, 2, 3, 4, 5, 6) 
+mat <- matrix(x, nrow = 2) 
 
-##############################################
-# 02-data types and structures 
+# Create vector 
+s <- c("spring", "autumn", "winter", "summer",  
+       "spring", "autumn") 
+factor(s)
 
-# vector
-east_midlands_cities <- c("Wuhan", "Zhengzhou", "Hefei")
-length(east_midlands_cities)
-east_midlands_cities[3] # Retrieve the third city
-east_midlands_cities[c(1, 3)] # Retrieve first and third city
+# Create 3-dimensional array 
+arr <- array(c(1, 2, 3), dim = c(3, 3, 3)) 
 
-a<-4:-10 # create a vector 
-a 
+# Create data frame of vectors
+x <- 1:5
+y <- LETTERS[1:5] 
+z <- c("Albert", "Bob", "Charlie", "Denver", "Elie") 
 
-seq_vec<-seq(1,4,by=0.5)  
-seq_vec  
-
-# factor
-
-x <- c("male", "female", "male", "male",  "female")
-sex <- factor(x)
-sex
-is.factor(sex)
-
-# list
-
-employee <- list(name="Joe",salary=55000,union=T)
-employee[[1]]
-employee$name
-
-# matrix
-
-P <- matrix(c(5:16), nrow = 4, byrow = TRUE) # create a matrix 
-print(P)  
-Q <- matrix(c(3:14), nrow = 4, byrow = FALSE)  
-print(Q)  
-
-row_names = c("row1", "row2", "row3", "row4")  
-col_names = c("col1", "col2", "col3")  
-R <- matrix(c(3:14), nrow = 4, byrow = TRUE, 
-            dimnames = list(row_names, col_names))  
-print(R)  
+df <- data.frame(x, y, z) 
 
 
-print(R[3,2])  
-
-R[R==12]<-0 # note "==" different from "=" in R
-print(R)  
-
-R <- matrix(c(5:16), nrow = 4,ncol=3)  # mathematical operations
-S <- matrix(c(1:12), nrow = 4,ncol=3)  
-sum<-R+S  # Addition 
-print(sum) 
-
-# data frame 
-
-emp.data<- data.frame(  
-  employee_id = c (1:5),   
-  employee_name = c("Shubham","Arpita","Nishka","Gunjan","Sumit"),  
-  sal = c(623.3,915.2,611.0,729.0,843.25),   
-  
-  starting_date = as.Date(c("2012-01-01", "2013-09-23", "2014-11-15", "2014-05-11",  
-                            "2015-03-27")),  
-  stringsAsFactors = FALSE  
-)  
-
-print(emp.data)  
-class(emp.data)
-
-final <- data.frame(emp.data$employee_id, emp.data$sal)  
-print(final)  
-
-final1 <- emp.data[1,]  
-print(final1) 
-
-final2 <- emp.data[4:5, ]  
-print(final2)  
-
-emp.data.1<-emp.data[-1,]  
-print(emp.data.1)  
-
-emp.data.2 <- emp.data[,2]  
-print(emp.data.2) 
-
-emp.data.3 <- emp.data$employee_name
-print(emp.data.3) 
-
-emp.data.4 <- emp.data[3,2]  
-print(emp.data.4) 
-
-# t(Matrix/data frame)  
-
-a <- matrix(c(4:12),nrow=3,byrow=TRUE)  
-a  
-b <- t(a)  
-b  
-
-# array
-
-vector1 <- c(5,9,3)
-vector2 <- c(10,11,12,13,14,15)
-result <- array(c(vector1, vector2), dim = c(3,3,2))
-print(result)
-
-###########################################
 # 03-conversion among data structures
 
 # convert matrix to data.frame
@@ -228,8 +123,9 @@ Array1
 
 # library("plotKML") # Vector to raster 
 
-####################################################
+#####################################################
 # 04-operations for data file 
+#####################################################
 
 library("tidyverse")  # load the tidyverse packages, incl. dplyr
 surveys <- read_csv("data/dat_type/portal_data_joined.csv") #  from tidyverse
@@ -265,9 +161,9 @@ surveys %>%
   group_by(sex) %>%
   tally()
 
-# Reshaping with gather and spread
-download.file("tinyurl.com/dcmac2017dec/data/surveys_wide.csv",
-              dest="data/dat_type/surveys_wide.csv")
+# # Reshaping with gather and spread
+# download.file("tinyurl.com/dcmac2017dec/data/surveys_wide.csv",
+#               dest="data/dat_type/surveys_wide.csv")
 surveys_wide <- read.csv("data/dat_type/surveys_wide.csv")
 head(surveys_wide)
 
@@ -306,8 +202,10 @@ surveys_complete <- surveys_complete %>% # Only keep the most common species
 
 write_csv(surveys_complete, "results/surveys_complete.csv")
 
-##------------------------------------------------------
-# F) Data visualization with ggplot2
+###############################################
+# 05-Data visualization with ggplot2
+###############################################
+
 surveys_complete <- read_csv("results/surveys_complete.csv")
 
 # Plotting scatter plot
@@ -442,3 +340,83 @@ ggsave("results/name_of_file.png", my_plot, width = 15, height = 10)
 ## This also works for grid.arrange() plots
 combo_plot <- grid.arrange(spp_weight_boxplot, spp_count_plot, ncol = 2, widths = c(4, 6))
 ggsave("results/combo_plot_abun_weight.png", combo_plot, width = 10, dpi = 300)
+
+########################################
+# 06-Best Practices for Writing R Code
+########################################
+# https://swcarpentry.github.io/r-novice-inflammation/06-best-practices-R.html
+# https://www.r-bloggers.com/2024/06/writing-r-code-the-good-way/
+
+# A) A well-organized directory structure helps navigating 
+# the project efficiently. It separates data, scripts, and 
+# results, making it easier to locate and manage files
+
+# project/
+#   ├── data/
+#   ├── scripts/
+#   └── results/
+
+# B) There are two ways to write R codes to generate our
+# analyses, both of which use the Source panel. Writing R
+# scripts in an editor by following the steps:
+# click File – New File – R Script
+
+
+# C) Customizing Snippets for tracking
+# Starting with an annotated description of who write the
+# code and what the code does for track when you have to 
+# look at or change it in the future
+# https://blog.devgenius.io/how-to-automatically-create-headers-in-r-scripts-be69152ac23f
+
+# D) Assignment Using <- Not =
+# The assignment operator <- is preferred over = for clarity
+# and consistency in R code
+
+x <- 2
+
+# E) using descriptive names for naming variables to improve
+# readability and avoid using reserved names such as c, T, or F 
+# as variable names to prevent conflicts with built-in functions
+
+vec <- c(1, 2, 3)
+
+# F) Defining a relative path for import files into R and
+# export them out R environment. For example:
+
+input_file <- "data/data.csv" 
+output_file <- "data/results.csv"
+
+# G) annotating and marking code using # or #- to set off 
+#  code sections or separate the function definitions. 
+
+input_data <- read.csv(input_file) # read input 
+sample_number <- nrow(input_data) # get number of samples 
+results <- some_other_function(input_file, 
+                               sample_number) 
+
+# H) If creating one or a few custom functions in script, 
+#  put them toward the top of code. If many functions, put
+#  them all in their own .R file and source those files
+
+source("src/myMean.R")
+myvector <- c(1, 2, 3)
+myMean(myvector) # from myMean.R
+
+# I) Proper indentation and spacing make code more readable 
+#  and maintainable
+
+mtcars <- mtcars[, c("mpg", "drat", "wt")]
+mtcars_max <- apply(mtcars, 
+                    MARGIN = 2, # applying the max() function to each column
+                    FUN = max, 
+                    na.rm = TRUE # na.rm is being passed to the max() function
+)
+mtcars_max
+
+# J) Pipes are widely used for streamline code by chaining 
+#  operations in a readable manner
+
+library(dplyr)
+data %>%
+  filter(x > 1) %>%
+  summarise(mean_y = mean(y))
