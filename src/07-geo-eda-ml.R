@@ -190,14 +190,13 @@ dplyr::rename(doubs_env_spe, abund=spe.abund)
 #                                 "doubs_env_spe.shp"))
 
 ########################################################
-# 03-ESDA focusing on SN, SWM and SA beyond EDA
+# 03-ESDA of spatial dependence for polygons
 #######################################################
 
-# A) Neighbors based on contiguity (Queen vs Rook)
-
-# a) the global spatial autocorrelation 
-
 # https://bookdown.org/lexcomber/GEOG3195/spatial-models-spatial-autocorrelation-and-cluster-analysis.html
+
+# A) the global spatial autocorrelation 
+
 library(spData)
 library(sf)
 library(spdep)
@@ -218,9 +217,11 @@ p_vble = # create the map
 
 p_vble 
 
+
 library(spdep)
 nb <- poly2nb(map, queen = TRUE) # determine adjacency 
 
+library(tmap)
 # examine zero links locations
 map$rn = rownames(map) 
 tmap_mode("view")
@@ -230,7 +231,7 @@ tm_shape(map) +
   tm_basemap("OpenStreetMap")
 tmap_mode("plot")
 
-# Create a line layer showing Queen's case contiguities
+# Create a line layer showing Queen's case contiguity
 gg_net <- nb2lines(nb,coords=st_geometry(st_centroid(map)), 
                    as_sf = F) 
 # Plot the contiguity and the map layer
@@ -242,9 +243,9 @@ p_adj
 
 # spatial weights Matrix and the lagged means
 
-nbw <- spdep::nb2listw(nb, style = "W") # compute the weighted list from nb object
+nbw <- spdep::nb2listw(nb, style = "W") # compute weight matrix from nb
 nbw$weights[1:3]
-map$lagged_means <- lag.listw(nbw, map$vble) # compute the lagged means
+map$lagged_means <- lag.listw(nbw, map$vble) # compute lagged means
 p_lagged = 
   ggplot(map) + geom_sf(aes(fill = lagged_means)) +
   scale_fill_gradient2(midpoint = 0.5, low = "red", high = "blue") +
@@ -252,7 +253,7 @@ p_lagged =
 
 cowplot::plot_grid(p_vble, p_lagged)
 
-p_lm = 
+p_lm = # create a lagged mean plot 
   ggplot(data = map, aes(x = vble, y = lagged_means)) +
   geom_point(shape = 1, alpha = 0.5) +
   geom_hline(yintercept = mean(map$lagged_means), lty = 2) +
@@ -261,7 +262,7 @@ p_lm =
   coord_equal()
 p_lm
 
-# create Moran plot and statistic test using weighted list
+# create a Moran plot and statistic test using weighted list
 moran.plot(x = map$vble, listw = nbw, asp = 1)
 
 moran.test(x = map$vble, listw = nbw) # for Moran’s I for statistic test
@@ -273,7 +274,7 @@ moran.range <- function(lw) {
 
 moran.range(nbw) # strongly clustered
 
-# b) local spatial autocorrelation and clusters
+# B) local spatial autocorrelation and clusters
 
 # Compute the local Moran’s I
 map$lI <- localmoran(x = map$vble, listw = nbw)[, 1] 
@@ -320,8 +321,62 @@ p_geto =
   theme_minimal()
 p_geto
 
-##----------------------------------------------
-# C) Creating Thiessen polygons from a point layer
+########################################################
+# 04-Incorporating spatial autocorrelation into ML
+#######################################################
+
+# A) Simple Linear Regression
+
+formula <- "vble ~ AREA + PERIMETER + HOVAL + INC + OPEN + X + Y"
+# compute model
+model1 <- lm(formula = formula, data = map)
+# view model statistics
+summary(model1)
+
+# B) Spatial Regression Models accounting for autocorrelation
+
+model2 <- spatialreg::lagsarlm( # lag model
+  formula = formula, 
+  data = map, 
+  listw = nbw
+)
+
+model3 <- spatialreg::errorsarlm( # error model
+  formula = formula, 
+  data = map, 
+  listw = nbw
+)
+
+jtools::export_summs(model1, model2, model3) # compare to linear model
+
+spdep::moran.test(model2$residuals, nbw) # model2 and models Moran's I test
+spdep::moran.test(model3$residuals, nbw)
+
+# C) Geographically Weighted Regression accounting for heterogeneity
+# load packages
+library(SpatialML)
+library(sf)
+library(tidyverse)
+
+library(GWmodel)
+map_sp <- map %>% # convert to sp object
+  as_Spatial()
+
+library(tidyverse)
+library(sf)
+system.file("gpkg/nc.gpkg", package="sf") |>
+  read_sf() -> nc
+
+nc1 <- nc |> mutate(SID = SID74/BIR74, NWB = NWBIR74/BIR74) 
+lm(SID ~ NWB, nc1) |>
+  predict(nc1, interval = "prediction") -> pr
+bind_cols(nc, pr) |> names()
+
+########################################################
+# 05-ESDA of spatial points and building a predict model
+#######################################################
+
+# A) Creating Thiessen polygons from a point layer
 
 library(sf)
 Doubs <- st_read("data/geo_data/doubs_env_spe.shp")
@@ -370,9 +425,9 @@ class(v)
 vtess_sf <- st_as_sf(v)
 plot(vtess_sf$geometry)
 
-# Contiguity-based spatial weights for Thiessen polygons
+# B) Contiguity-based spatial weights for Thiessen polygons
 st_queen <- function(a, b = a) st_relate(a, b, pattern = "F***T****")
-queen.sgbp <- st_queen(vtess.sf) # convert to class nb
+queen_sgbp <- st_queen(vtess_sf) # convert to class nb
 as.nb.sgbp <- function(x, ...) {
   attrs <- attributes(x)
   x <- lapply(x, function(i) { if(length(i) == 0L) 0L else i } )
@@ -381,24 +436,24 @@ as.nb.sgbp <- function(x, ...) {
   x
 }
 
-queen.nb <- as.nb.sgbp(queen.sgbp)
+queen_nb <- as.nb.sgbp(queen_sgbp)
 
 # the distribution of the number of neighbors
 library(spdep)
-queen.nb.card <- card(queen.nb)
+queen_nb_card <- card(queen_nb)
 library(ggplot2)
 ggplot() +
-  geom_histogram(aes(x=queen.nb.card)) +
+  geom_histogram(aes(x=queen_nb_card)) +
   xlab("Number of Neighbors")
-summary(queen.nb)
+summary(queen_nb)
 
-plot(queen.nb,coords, lwd=.2, col="blue", cex = .5)
+plot(queen_nb,coords, lwd=.2, col="blue", cex = .5)
 
 library(sfdep)
 doubs_lags <- doubs_sfxy |> 
   mutate(
-    nb = st_contiguity(vtess.sf$geometry),
-    wt = st_weights(queen.nb),
+    nb = st_contiguity(vtess_sf$geometry),
+    wt = st_weights(queen_nb),
     vtess_lag = st_lag(doubs_sfxy$spe_abund, nb, wt)
   ) 
 
@@ -417,7 +472,7 @@ gg_doubs_obs
 
 patchwork::wrap_plots(gg_doubs_obs, gg_doubs_lag)
 
-# B) Global and Local spatial autocorrelation, clusters
+# C) Global and Local spatial autocorrelation, clusters
 
 ##-----------------------------------------------------
 ## As for the points
@@ -438,7 +493,7 @@ doubs_sf <- st_read("data/geo_data/doubs_sf.shp")
 doubs_sfxy <- doubs_sf |>
   rename(x=lon, y = lat)
 
-# construct voronoi polygons of sp and sf
+# A) constructING Thiessen/voronoi polygons from point data
 
 vtess <- deldir(doubs_sfxy$x, doubs_sfxy$y)
 plot(vtess, wlines="tess", wpoints="none",
@@ -480,16 +535,17 @@ as_nb_sgbp <- function(x, ...) {
   x
 }
 
-queen_nb <- as.nb.sgbp(queen_sgbp)
+queen_nb <- as_nb_sgbp(queen_sgbp)
 
 queen_weights <- nb2listw(queen_nb) # get row standardized weights
 
-# Creating a Moran scatter plot
+# B) Calculating global moran I and testing significance
 
 moran <- moran(doubs_sfxy$spe_abund, 
                queen_weights, length(queen_nb), 
                Szero(queen_weights))
 moran$I 
+
 
 doubs_sfxy$lagged_spe_abund <- lag.listw(queen_weights,
                                          doubs_sfxy$spe_abund)
@@ -516,12 +572,16 @@ ggplot(data = doubs_sfxy, aes(x=standardized_spe_abund,
 # https://rpubs.com/laubert/SACtutorial
 spe_abund_gI <- moran.test(doubs_sfxy$spe_abund, 
                            queen_weights, zero.policy = TRUE)
+spe_abund_gI
 
 moran.range <- function(lw) {
   wmat <- listw2mat(lw)
   return(range(eigen((wmat + t(wmat))/2)$values))
 }
-moran.range(queen_weights) # min-max=random, otherwise cluster or dispersed
+
+# I is between min-max, then random, otherwise cluster or dispersed
+
+moran.range(queen_weights) 
 
 #Calculate Z-score
 mI <- spe_abund_gI$estimate[[1]] # global MI
@@ -529,215 +589,48 @@ eI <- spe_abund_gI$estimate[[2]] #Expected MI
 var <- spe_abund_gI$estimate[[3]] #Variance of values
 zscore <- (mI-eI)/var**0.5 # -1.96 <zscore <1.96, no spatial correlation
 
-# # Assessing significance
-# set.seed(2024)
-# draw <- sample(doubs_sfxy$spe_abund, size = length(doubs_sfxy$spe_abund))
-# draw
+# C) Local Spatial Autocorrelation (hot-spots and outliers) and test
 
-# library(robustHD)
-# lag1 <- lag.listw(queen.weights,draw)
-# lmfit <- lm(standardize(lag1) ~ standardize(draw))
-# summary(lmfit)
+spe_abund_lI <- localmoran(doubs_sfxy$spe_abund, queen_weights)
 
-# randomized_moran <- rep(NA, 999)
-# for(i in 1:999){
-#   draw <- sample(doubs_sfxy$spe_abund, size = length(doubs_sfxy$spe_abund))
-#   lag <- lag.listw(queen.weights,draw)
-#   lmfit <- lm(standardize(lag) ~ standardize(draw))
-#   randomized_moran[i] <- lmfit$coefficients[2] 
-# }
-
-# summary(randomized_moran)
-# sd(randomized_moran)
-
-# # the number of samples had higher Moran’s I statistic 
-# # than the observed value
-# 
-# length(which(randomized_moran > .133))
-
-# only 1 value in all of the permutations that is 
-# higher than the test statistic, so p=(1+R)/(1+M)
-# = 0.002 (HERE R=1, M=999)
-
-# # visualize the distribution of moran I
-# 
-# df <- data.frame(moran = randomized_moran)
-# ggplot(data = df,aes(x=moran)) +
-#   geom_density() +
-#   geom_vline(xintercept = moran[[1]], col = "green") +
-#   geom_vline(xintercept = mean(randomized_moran), col = "blue")
-# 
-# # Chow test Moran’s I scatterplot
-# 
-# mid_x <- mean(doubs_sfxy$x)
-# mid_y <- mean(doubs_sfxy$y)
-# doubs_sfxy<- doubs_sfxy |> 
-#   mutate(bottom_left = if_else((x < mid_x & y < mid_y),"Select", "Rest"))
-# 
-# ggplot(doubs_sfxy, aes(x=standardized_spe_abund,y=standardized_lag_spe_abund)) +
-#   geom_point(aes(color=bottom_left)) +
-#   geom_smooth(aes(color=bottom_left), method = lm, se = FALSE) +
-#   geom_smooth(method=lm,se = FALSE, color = "black") +
-#   scale_color_manual(values=c("blue","red"))  +
-#   labs(color="Selection") +
-#   geom_hline(yintercept = 0, lty = 2) +
-#   geom_vline(xintercept = 0, lty = 2) +
-#   ggtitle("Chow test Moran Scatterplot")
-# 
-# doubs.select <- doubs_sfxy %>% filter(bottom_left == "Select")
-# doubs.rest <- doubs_sfxy %>% filter(bottom_left == "Rest")
-# 
-# reg.select <- lm(standardized_lag_spe_abund~standardized_spe_abund, 
-#                  data=doubs.select)
-# reg.rest <- lm(standardized_lag_spe_abund~standardized_spe_abund, 
-#                data=doubs.rest)
-# summary(reg.select)
-# summary(reg.rest)
-# 
-# chow <- chow.test(doubs.select$standardized_lag_spe_abund, 
-#                   doubs.select$standardized_spe_abund, 
-#                   doubs.rest$standardized_lag_spe_abund, 
-#                   doubs.rest$standardized_spe_abund)
-# chow
-
-# Spatial Correlogram
-# 
-coords <- cbind(doubs_sfxy$x, doubs_sfxy$y)
-dist_band_nb <- dnearneigh(coords,
-                           0, 37576.59) # critical.threshold
-sp <- sp.correlogram(dist.band.nb,
-                     doubs_sfxy$spe_abund,
-                     order = 10,
-                     method = "I",
-                     style = "W",
-                     randomisation = TRUE,
-                     spChk = NULL,
-                     zero.policy = TRUE)
-plot(sp)
-
-morans <- sp$res[,1]
-df <- data.frame(Morans_I = morans,lags = 1:10 )
-ggplot(data = df, aes(x=lags,y=Morans_I)) +
-  geom_point() +
-  geom_smooth(col = "purple", se = FALSE) +
-  geom_hline(yintercept = 0) +
-  ylim(-.5,.5) 
-
-df$euclidean_distance <- df$lags * 37576.59
-ggplot(data = df, aes(x=euclidean_distance,y=Morans_I)) +
-  geom_point() +
-  geom_smooth(col = "purple", se = FALSE) +
-  geom_hline(yintercept = 0) +
-  ylim(-.5,.5) +
-  scale_x_continuous(breaks = df$euclidean_distance)
-
-pairs <- rep(NA, 10)
-
-for (i in 1:10){
-  nb <- dnearneigh(coords, (i - 1) * 37576.59, i * 37576.59)
-  pairs[i] <- sum(card(nb)) / 2
-}
-
-df <- data.frame(lag_order = 1:10, auto_corr = morans, num_pairs = pairs)
-df$euclidean_distance <- df$lag_order * 37576.59
-
-p1 <- ggplot(data = df, aes(x = euclidean_distance,y = auto_corr)) +
-  geom_point() +
-  geom_smooth(col = "purple", se = FALSE) +
-  geom_hline(yintercept = 0) +
-  ylim(-1,1) +
-  scale_x_continuous(breaks = df$euclidean_distance)
-p2 <- ggplot(data = df, aes(x=euclidean_distance,y = num_pairs, fill = as.factor(euclidean_distance))) +
-  geom_bar(stat = "identity") +
-  scale_fill_brewer(palette = "Paired") +
-  theme(legend.position = "none") +
-  geom_text(aes(label=num_pairs), position = position_dodge(width = .9), vjust=-.25) +
-  ylim(0, 1.2 * max(pairs)) +
-  scale_x_continuous(breaks = df$euclidean_distance)
-p1
-p2
-
-grid.arrange(p1,p2,ncol = 1)
-
-# The dot corresponds with distances between 0 and 4823 feet. 
-# The dashed line indicates a spatial autocorrelation of 0. 
-# The autocorrelation starts positive and trend the line.
-
-#########################################################
-# 03-Local Spatial Autocorrelation (hot-spots and outliers)
-
-spe_abund_lI <- localmoran(doubs_sfxy$spe_abund, queen.weights)
-
-#Extracting Local Moran’s I and appending it to the dataset
+# Extracting Local Moran’s I and appending it to the dataset
 
 doubs_sfxy$lI <- spe_abund_lI[,1]
 doubs_sfxy$ElI <- spe_abund_lI[,2]
 doubs_sfxy$VarlI <- spe_abund_lI[,3]
-doubs_sfxy$ZlI <- spe_abund_lI[,4]
+doubs_sfxy$ZlI <- spe_abund_lI[,4] # standard deviate of lI
 doubs_sfxy$PlI <- spe_abund_lI[,5]
 
+# visualizing local moran's I
+
 map_lI <- tm_shape(doubs_sfxy) + tm_lines()
-tm_sf(col = "ZlI", 
-      title = "Local Moran's I - spe_abund", 
+tm_sf(col = "ZlI",
+      title = "Local Moran's I - spe_abund",
       style = "fixed",
       breaks = c(-Inf, -1.96, 1.96, Inf),
       labels = c("Negative SAC", "Random SAC", "Positive SAC"),
       palette = "RdBu", n = 3,
       midpoint = NA,
       border.alpha = 0.3) +
-  
   map_lI
 
-# A) Hot-spot Analysis 
-# https://github.com/mpjashby/sfhotspot
+# http://www.geo.hunter.cuny.edu/~ssun/R-Spatial/spregression.html#local-indicators-of-spatial-autocorrelation
 
-doubs <- st_read('data/SPdata/doubs_env_spe.shp')
-head(doubs)
-sum(is.na(doubs))
-doubs_clean <- na.omit(doubs)
-names(doubs_clean)
-doubs_relevant <- dplyr::select(doubs_clean, c("points", "spe_abund", "geometry"))
-head(doubs_relevant)
+# derive the cluster/outlier types 
+significanceLevel <- 0.05
+meanVal <- mean(doubs_sfxy$spe_abund)
 
-library(sfhotspot)
-library(tidyverse)
+spe_abund_lI %>% tibble::as_tibble() %>%
+  magrittr::set_colnames(c("Ii","E.Ii","Var.Ii","Z.Ii","Pr()")) %>%
+  dplyr::mutate(coType = dplyr::case_when(
+    `Pr()` > 0.05 ~ "Insignificant",
+    `Pr()` <= 0.05 & Ii >= 0 & doubs_sfxy$spe_abund >= meanVal ~ "HH",
+    `Pr()` <= 0.05 & Ii >= 0 & doubs_sfxy$spe_abund < meanVal ~ "LL",
+    `Pr()` <= 0.05 & Ii < 0 & doubs_sfxy$spe_abund >= meanVal ~ "HL",
+    `Pr()` <= 0.05 & Ii < 0 & doubs_sfxy$spe_abund < meanVal ~ "LH"
+  ))
 
-fishes_hotspots <- hotspot_gistar(doubs_relevant)
-fishes_hotspots %>% 
-  filter(gistar > 0, pvalue < 0.05) %>% 
-  ggplot(aes(colour = kde, fill = kde)) +
-  geom_sf() +
-  scale_colour_distiller(aesthetics = c("colour", "fill"), direction = 1) +
-  labs(title = "Density of fishes in Le Doubs") +
-  theme_void()
-
-#counts the number of points in each cell in a grid
-point_counts <- hotspot_count(doubs_relevant)
-point_counts
-
-# plot that grid of cells
-ggplot() +
-  geom_sf(
-    mapping = aes(fill = n),
-    data = point_counts,
-    alpha = 0.75,
-    colour = NA
-  ) +
-  scale_fill_distiller(direction = 1)
-
-# calculate kernel density estimates for each cell 
-doubs_kde <- hotspot_kde(doubs_relevant)
-doubs_kde
-ggplot() +
-  geom_sf(
-    mapping = aes(fill = kde),
-    data = doubs_kde,
-    alpha = 0.75,
-    colour = NA
-  ) +
-  scale_fill_distiller(direction = 1)
-
-## B) Spatial outlines detection
+## Spatial outliers detection
 ## https://gis.stackexchange.com/questions/219255/spatial-outliers-detection-in-r
 #  
 library(sp)
@@ -745,51 +638,49 @@ library(spdep) # create spatial weights matrix objects
 library(RANN) # nearest neighbors for Euclidean metric
 library(spatialEco) # spatial data manipulation
 
-# First, looking at the modified z-score on a-spatial
+# looking at the modified z-score on a-spatial
 
-DES <- st_read("data/SPdata/doubs_env_spe.shp")
-DES_sp <- st_as_sf(DES)
-DES_df <- as(DES_sp, "Spatial")
-names(DES_df)
+DES_sf <- st_read("data/geo_data/doubs_env_spe.shp")
+DES_sp <- as(DES_sf, "Spatial") # convert sf to sp
+names(DES_sp)
 
-# Second, calculating global outliers and then 
-# calculating the local z-score and variance
+# calculating global outliers and local z-score and variance
 
-(DES_df$Zscore <- # global outliers
-    spatialEco::outliers(DES_df$spe_abund))  
-spplot(DES_df, "Zscore", 
+(DES_sp$Zscore <- # global outliers
+    spatialEco::outliers(DES_sp$spe_abund))  
+spplot(DES_sp, "Zscore", 
        col.regions=cm.colors(10))
 
-dnn <- RANN::nn2(coordinates(DES_df), # local outliers
+dnn <- RANN::nn2(coordinates(DES_sp), # local outliers
                  searchtype="radius", 
                  radius = 1000)$nn.idx
-var.spe_abund <- rep(NA,nrow(DES_df))
-z.spe_abund <- rep(NA,nrow(DES_df))  
+var_spe_abund <- rep(NA,nrow(DES_sp))
+z_spe_abund <- rep(NA,nrow(DES_sp))  
 
 for(i in 1:nrow(dnn)){
   dnn.idx <- dnn[i,] 
-  var.spe_abund[i] <- var(DES_df[dnn.idx[dnn.idx != 0],]$spe_abund, na.rm=TRUE)
-  z.spe_abund[i] <- outliers(DES_df[dnn.idx[dnn.idx != 0],]$spe_abund)[1]
+  var.spe_abund[i] <- var(DES_sp[dnn.idx[dnn.idx != 0],]$spe_abund, na.rm=TRUE)
+  z.spe_abund[i] <- outliers(DES_sp[dnn.idx[dnn.idx != 0],]$spe_abund)[1]
 }
 
 var.spe_abund[!is.finite(var.spe_abund)] <- 0 
 z.spe_abund[!is.finite(z.spe_abund)] <- 0 
 
-DES_df$var.spe_abund <- var.spe_abund
-spplot(DES_df, "var.spe_abund", col.regions=cm.colors(10))
+DES_sp$var.spe_abund <- var.spe_abund
+spplot(DES_sp, "var.spe_abund", col.regions=cm.colors(10))
 
-DES_df$z.spe_abund <- z.spe_abund
-spplot(DES_df, "z.spe_abund", col.regions=cm.colors(10))
+DES_sp$z.spe_abund <- z.spe_abund
+spplot(DES_sp, "z.spe_abund", col.regions=cm.colors(10))
 
 # local autocorrelation (Local Moran's-I or LISA)
 
 all.linked <- 
-  max(unlist(nbdists(knn2nb(knearneigh(coordinates(DES_df))), 
-                     coordinates(DES_df))))
-nb <- dnearneigh(DES_df, 0, all.linked)
+  max(unlist(nbdists(knn2nb(knearneigh(coordinates(DES_sp))), 
+                     coordinates(DES_sp))))
+nb <- dnearneigh(DES_sp, 0, all.linked)
 
-mI <- localmoran(DES_df@data[,"spe_abund"], nb2listw(nb, style="W"))
-LocalI <- DES_df
+mI <- localmoran(DES_sp@data[,"spe_abund"], nb2listw(nb, style="W"))
+LocalI <- DES_sp
 LocalI@data <- data.frame(ID=rownames(LocalI@data), as.data.frame(mI))
 names(LocalI@data)[6] <- "Pr"
 spplot(LocalI, "Z.Ii", xlab="Local Morans-I", col.regions=topo.colors(30))   
@@ -809,4 +700,3 @@ LocalI@data$HotSpots <- as.factor(LocalI@data$HotSpots)
 spplot(LocalI, "HotSpots", 
        xlab="Local Moran’s-I Hot Spots", 
        col.regions=c("blue","red"))
-

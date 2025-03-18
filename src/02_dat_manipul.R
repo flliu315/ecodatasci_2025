@@ -12,17 +12,22 @@
 cat("\014") # Clears the console
 rm(list = ls()) # Remove all variables
 
-# 01-value or data types
-
-# double, integer, logical, character, datetime
+# 01- data types
 # https://www.geeksforgeeks.org/r-data-types/
+
+# numeric, integer, logical, character, complex
 
 # Double
 
-x <- 5.23
-is.numeric(x)
+x <- 5.23 # Assign a decimal value to x
+
+is.numeric(x) # check the data type
 is.integer(x)
 is.double(x)
+
+class(x) # check the data type
+typeof(x)
+mode(x)
 
 # Integer
 
@@ -38,58 +43,182 @@ x <- "elevated"
 is.character(x)
 is.numeric(x)
 
-# Datetime
+# complex
 
-x <- Sys.time()
+x <- 1 + 2i
+class(1 + 2i)
 
-# 02-creating objects and assigning variables
+# 02- data objects
 # https://www.geeksforgeeks.org/r-objects/
 
-# R objects include vectors, list, dataframe, matrix, array
-# Create vectors 
+# A) Vectors/scalars
 
 c(1,4,7)
 Num_variable <- c(1,4,7) # assign this to a variable for future use
+print(Num_variable)
+(Num_variable <- c(1,4,7)) # assign and print(s) 
 
-# Create list 
-ls <- list(c(1, 2, 3, 4), list("a", "b", "c")) 
+# Basic information 
+length(Num_variable)  # How many elements
+typeof(Num_variable)  # Of which type
+is.vector(Num_variable) # Data structure:
+is.list(Num_variable)
+names(Num_variable)
+str(Num_variable) 
 
-# Create matrix 
-x <- c(1, 2, 3, 4, 5, 6) 
-mat <- matrix(x, nrow = 2) 
+a <- 100
+is.vector(a)
+length(a)
 
-# Create vector 
-s <- c("spring", "autumn", "winter", "summer",  
-       "spring", "autumn") 
-factor(s)
+# Accessing elements
+Num_variable[2]
+Num_variable[-2]
+which(Num_variable == "4") # know elements for location
 
-# Create 3-dimensional array 
-arr <- array(c(1, 2, 3), dim = c(3, 3, 3)) 
+# Indexing by subset()
 
-# Create data frame of vectors
-x <- 1:5
-y <- LETTERS[1:5] 
-z <- c("Albert", "Bob", "Charlie", "Denver", "Elie") 
+(v <- c(1:2, NA, 4:6, NA, 8:10))
+v[v > 5] # missing/NA values are preserved
+subset(v, v > 5)  # missing/NA values are lost 
 
-df <- data.frame(x, y, z) 
+# B) Rectangular objects
 
+# a) matrices/Arrays
 
-# 03-conversion among data structures
+(m0 <- matrix(data = 1:9, nrow = 3, byrow = TRUE))
+
+x <- 1:3 # Creating 3 vectors
+y <- 4:6
+z <- 7:9
+
+(m1 <- rbind(x, y, z)) 
+
+# matrix attributions
+
+mode(m0)
+typeof(m0)
+length(m0)
+
+is.vector(m0)
+is.matrix(m0)
+dim(m0)
+
+# Indexing matrices
+
+m0[2, 3] #  rows, or columns of matrices
+m0 > 5  # returns a matrix of logical values
+sum(m0) # Computations with matrices
+max(m0)
+mean(m0)
+colSums(m0)
+rowSums(m0)
+t(m0)
+
+# b) data frames/tibbles
+
+name   <- c("Adam", "Bertha", "Cecily", "Dora", "Eve", "Nero", "Zeno")
+gender <- c("male", "female", "female", "female", "female", "male", "male")
+age    <- c(21, 23, 22, 19, 21, 18, 24)
+height <- c(165, 170, 168, 172, 158, 185, 182)
+
+df <- data.frame(name, gender, age, height, 
+                 stringsAsFactors = TRUE)
+df  
+
+is.matrix(df)
+is.data.frame(df)
+dim(df)
+
+tb <- tibble::as_tibble(df) # Turn to a tibble tb 
+dim(tb) 
+
+# work with df
+
+df[5, 3]  # numeric indexing 
+df[6, ]  
+df[ , 4] 
+
+names(df)    
+names(df)[4] 
+
+df$gender  
+df$age 
+
+df$gender == "male"
+sum(df$gender == "male") 
+
+df$age < 21
+df$age[df$age < 21] 
+df$name[df$age < 21]
+
+subset(df, age > 20) # Subsetting rectangular tables
+subset(df, gender == "male")
+subset(df, age > 20 | gender == "male")
+
+df[age > 20, ]
+df[gender == "male", ]
+df[age > 20 | gender == "male", ] 
+df[age > 20 & gender == "male", ]
+
+# c) categories and factors
+
+df <- data.frame(name, gender, age, height, 
+                 stringsAsFactors = FALSE) # the default (as of R 4.0.0)
+df
+df$gender
+is.character(df$gender)  
+is.factor(df$gender)
+all.equal(df$gender, gender) 
+
+df <- data.frame(name, gender, age, height, 
+                 stringsAsFactors = TRUE)
+
+df$gender  
+is.factor(df$gender)
+typeof(df$gender)
+unclass(df$gender)
+
+df$gender <- as.factor(df$gender) # convert to a "factor"
+df$gender
+
+# d) Lists
+
+l_1 <- list(1, 2, 3) # 3 elements (all numeric scalars)
+l_1
+
+l_2 <- list(1, c(2, 3))  # 2 elements (different lengths)
+l_2
+
+l_3 <- list(1, "B", 3)
+l_3
+
+# Inspecting lists
+
+is.list(l_3)  # a list
+is.list(1:3)  # a vector
+is.list("A")
+str(l_3)
+
+# Accessing list elements
+
+l_2[2] 
+l_2[[2]] 
+
+x <- list(1:3)
+x[[1]][3] # The 3rd element at the first position
+
+# C) conversion among objects
+
+df$gender <- as.factor(df$gender) 
+df$gender
 
 # convert matrix to data.frame
 matrix_data=matrix(c(1,2,3,4,5,6,7,8), nrow=4) # default byrow=FALSE
-
 print(matrix_data) 
-
 class(matrix_data)
-
 dataframe_data=as.data.frame(matrix_data) # convert the matrix into dataframe
-
 print(dataframe_data)
-
 class(dataframe_data)
-
-# convert data frame to matrix
 
 dataframe_data1 <- data.frame(a = 1:3, b = letters[10:12],
                               c = seq(as.Date("2004-01-01"), by = "week", 
@@ -115,17 +244,87 @@ df1
 df2 <- data.frame(x = 11:15,y = 15:11)
 df2
 
-Array1 <- array(data = c(unlist(df1),  unlist(df2)),
-                dim = c(5, 2, 2),
-                dimnames = list(rownames(df1),
-                                colnames(df1)))
-Array1                                  
 
-# library("plotKML") # Vector to raster 
+# 03-function objects
+
+sum(c(1, 2))
+sum(1, 2, 3, NA, na.rm = TRUE)
+paste0("hell", "o ", "world", "!")
+substr(x = "television", start = 5, stop = 10)
+?substr
+
+?filter  # 2 different packages 
+
+# Indicating the filter() function of a given package: 
+?stats::filter
+?dplyr::filter
+
+library(ds4psy)  # load the package
+plot_fn()
+plot_fn(x = 1)
+plot_fn(x = 7)
+
+plot_fn(x = 5, y = 1)
+plot_fn(x = 5, y = 5, A = TRUE, B = FALSE, C = TRUE, 
+        D = FALSE, E = FALSE, F = FALSE,  g = "black")
+
+
+# 04-assigning an object with a variable, i.e., naming
+
+# case sensitive 
+o <- 10  # assign/set o to 10
+O <-  5  # assign/set O to  5
+
+o * O  
+o * 0  # Note: O differs from 0
+o / O
+O / 0
+
+length(o) # Object shape
+dim(o)
+
+mode(o) # Object type
+
+# Avoid using spaces inside variables 
+
+# naming tea_pot instead of tea pot
+
 
 #####################################################
-# 04-operations for data file 
+# 05-import data from a file stored on a web site
 #####################################################
+
+# A) using download.file() or readr::read_csv()
+# https://www.davidzeleny.net/anadat-r/doku.php/en:data:doubs
+
+# Set the base URL for the datasets
+
+base_url <- "https://raw.githubusercontent.com/zdealveindy/anadat-r/master/data/"
+
+datasets <- c("DoubsSpe.csv","DoubsEnv.csv","DoubsSpa.csv")  # List of datasets 
+
+# Download each dataset
+for(dataset in datasets) {
+  full_url <- paste0(base_url, dataset) # full URL for each file
+  dest_file <- file.path("data/rbasic_data", dataset) # the destination
+  download.file(full_url, destfile = dest_file, mode = "wb") # Download
+
+  cat("Downloaded:", dataset, "\n") # Print a message for complete
+}
+
+# B) loading data from R package
+
+# data()
+# data(doubs, package = "ade4")
+
+DoubsEnv <- readr::read_csv("data/rbasic_data/DoubsEnv.csv")
+DoubsEnv
+
+# Checking the dataset
+
+str(DoubsEnv)
+tibble::glimpse(DoubsEnv)
+
 
 library("tidyverse")  # load the tidyverse packages, incl. dplyr
 surveys <- read_csv("data/dat_type/portal_data_joined.csv") #  from tidyverse
@@ -340,83 +539,3 @@ ggsave("results/name_of_file.png", my_plot, width = 15, height = 10)
 ## This also works for grid.arrange() plots
 combo_plot <- grid.arrange(spp_weight_boxplot, spp_count_plot, ncol = 2, widths = c(4, 6))
 ggsave("results/combo_plot_abun_weight.png", combo_plot, width = 10, dpi = 300)
-
-########################################
-# 06-Best Practices for Writing R Code
-########################################
-# https://swcarpentry.github.io/r-novice-inflammation/06-best-practices-R.html
-# https://www.r-bloggers.com/2024/06/writing-r-code-the-good-way/
-
-# A) A well-organized directory structure helps navigating 
-# the project efficiently. It separates data, scripts, and 
-# results, making it easier to locate and manage files
-
-# project/
-#   ├── data/
-#   ├── scripts/
-#   └── results/
-
-# B) There are two ways to write R codes to generate our
-# analyses, both of which use the Source panel. Writing R
-# scripts in an editor by following the steps:
-# click File – New File – R Script
-
-
-# C) Customizing Snippets for tracking
-# Starting with an annotated description of who write the
-# code and what the code does for track when you have to 
-# look at or change it in the future
-# https://blog.devgenius.io/how-to-automatically-create-headers-in-r-scripts-be69152ac23f
-
-# D) Assignment Using <- Not =
-# The assignment operator <- is preferred over = for clarity
-# and consistency in R code
-
-x <- 2
-
-# E) using descriptive names for naming variables to improve
-# readability and avoid using reserved names such as c, T, or F 
-# as variable names to prevent conflicts with built-in functions
-
-vec <- c(1, 2, 3)
-
-# F) Defining a relative path for import files into R and
-# export them out R environment. For example:
-
-input_file <- "data/data.csv" 
-output_file <- "data/results.csv"
-
-# G) annotating and marking code using # or #- to set off 
-#  code sections or separate the function definitions. 
-
-input_data <- read.csv(input_file) # read input 
-sample_number <- nrow(input_data) # get number of samples 
-results <- some_other_function(input_file, 
-                               sample_number) 
-
-# H) If creating one or a few custom functions in script, 
-#  put them toward the top of code. If many functions, put
-#  them all in their own .R file and source those files
-
-source("src/myMean.R")
-myvector <- c(1, 2, 3)
-myMean(myvector) # from myMean.R
-
-# I) Proper indentation and spacing make code more readable 
-#  and maintainable
-
-mtcars <- mtcars[, c("mpg", "drat", "wt")]
-mtcars_max <- apply(mtcars, 
-                    MARGIN = 2, # applying the max() function to each column
-                    FUN = max, 
-                    na.rm = TRUE # na.rm is being passed to the max() function
-)
-mtcars_max
-
-# J) Pipes are widely used for streamline code by chaining 
-#  operations in a readable manner
-
-library(dplyr)
-data %>%
-  filter(x > 1) %>%
-  summarise(mean_y = mean(y))

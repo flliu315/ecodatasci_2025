@@ -14,15 +14,19 @@ rm(list = ls()) # Remove all variables
 
 # https://bookdown.org/manishpatwal/bookdown-demo/list-in-r.html
 
+#######################################################
+###### basic operations of R ##########################
+#######################################################
 # 01-starting RStudio and configure its appearance
-
-# 02-introduce of RStudio panes and their functions
-
-# 03-basic some operations by typing on R console
+# and introduce RStudio panes and their functions
 
 # getwd() # current working directory
-# setwd() # set working directory
+# setwd() # Session > set working directory
 # list.files() or dir()
+# rm(list = ls()) 
+
+# 02-basic operations via R console (one way)
+# after the prompt type the commmands and hit
 
 # Airthmetic Operations
 2+2  # Addition
@@ -47,9 +51,259 @@ x > y
 TRUE & FALSE # "&" is Logical AND
 TRUE | FALSE # “|” is for Logical OR
 
-# 04-Almost everything in R is done through functions
+# 03-basic operation via R editor (another way)
 
-# A) Built-in Functions in R
+# open editor: File > new file > R script
+# repeat above in the RStuido editor and run
+# save the script in a given folder
+ 
+##################################################
+########## R data objects and operations #########
+##################################################
+
+# 01- data types
+# https://www.geeksforgeeks.org/r-data-types/
+
+# numeric, integer, logical, character, complex
+
+# Double
+
+x <- 5.23 # Assign a decimal value to x
+
+is.numeric(x) # check the data type
+is.integer(x)
+is.double(x)
+
+class(x) # check the data type
+typeof(x)
+mode(x)
+
+# Integer
+
+x <- 5L 
+
+# Logical
+
+x <- c(TRUE, TRUE, FALSE)
+
+# Character
+
+x <- "elevated"
+is.character(x)
+is.numeric(x)
+
+# complex
+
+x <- 1 + 2i
+class(1 + 2i)
+
+# These operations can be repeated in the RStudio script
+# editor:
+
+# click File – New File – R Script
+
+# 02- data objects
+# https://www.geeksforgeeks.org/r-objects/
+
+# A) Vectors/scalars
+
+c(1,4,7)
+Num_variable <- c(1,4,7) # assign this to a variable for future use
+print(Num_variable)
+(Num_variable <- c(1,4,7)) # assign and print(s) 
+
+# Basic information 
+length(Num_variable)  # How many elements
+typeof(Num_variable)  # Of which type
+is.vector(Num_variable) # Data structure:
+is.list(Num_variable)
+names(Num_variable)
+str(Num_variable) 
+
+a <- 100
+is.vector(a)
+length(a)
+
+# Accessing elements
+Num_variable[2]
+Num_variable[-2]
+which(Num_variable == "4") # know elements for location
+
+# Indexing by subset()
+
+(v <- c(1:2, NA, 4:6, NA, 8:10))
+v[v > 5] # missing/NA values are preserved
+subset(v, v > 5)  # missing/NA values are lost 
+
+# B) Rectangular objects
+
+# a) matrices/Arrays
+
+(m0 <- matrix(data = 1:9, nrow = 3, byrow = TRUE))
+
+x <- 1:3 # Creating 3 vectors
+y <- 4:6
+z <- 7:9
+
+(m1 <- rbind(x, y, z)) 
+
+# matrix attributions
+
+mode(m0)
+typeof(m0)
+length(m0)
+
+is.vector(m0)
+is.matrix(m0)
+dim(m0)
+
+# Indexing matrices
+
+m0[2, 3] #  rows, or columns of matrices
+m0 > 5  # returns a matrix of logical values
+sum(m0) # Computations with matrices
+max(m0)
+mean(m0)
+colSums(m0)
+rowSums(m0)
+t(m0)
+
+# b) data frames/tibbles
+
+name   <- c("Adam", "Bertha", "Cecily", "Dora", "Eve", "Nero", "Zeno")
+gender <- c("male", "female", "female", "female", "female", "male", "male")
+age    <- c(21, 23, 22, 19, 21, 18, 24)
+height <- c(165, 170, 168, 172, 158, 185, 182)
+
+df <- data.frame(name, gender, age, height, 
+                 stringsAsFactors = TRUE)
+df  
+
+is.matrix(df)
+is.data.frame(df)
+dim(df)
+
+tb <- tibble::as_tibble(df) # Turn to a tibble tb 
+dim(tb) 
+
+# work with df
+
+df[5, 3]  # numeric indexing 
+df[6, ]  
+df[ , 4] 
+
+names(df)    
+names(df)[4] 
+
+df$gender  
+df$age 
+
+df$gender == "male"
+sum(df$gender == "male") 
+
+df$age < 21
+df$age[df$age < 21] 
+df$name[df$age < 21]
+
+subset(df, age > 20) # Subsetting rectangular tables
+subset(df, gender == "male")
+subset(df, age > 20 | gender == "male")
+
+df[age > 20, ]
+df[gender == "male", ]
+df[age > 20 | gender == "male", ] 
+df[age > 20 & gender == "male", ]
+
+# c) categories and factors
+
+df <- data.frame(name, gender, age, height, 
+                 stringsAsFactors = FALSE) # the default (as of R 4.0.0)
+df
+df$gender
+is.character(df$gender)  
+is.factor(df$gender)
+all.equal(df$gender, gender) 
+
+df <- data.frame(name, gender, age, height, 
+                 stringsAsFactors = TRUE)
+
+df$gender  
+is.factor(df$gender)
+typeof(df$gender)
+unclass(df$gender)
+
+df$gender <- as.factor(df$gender) # convert to a "factor"
+df$gender
+
+# d) Lists
+
+l_1 <- list(1, 2, 3) # 3 elements (all numeric scalars)
+l_1
+
+l_2 <- list(1, c(2, 3))  # 2 elements (different lengths)
+l_2
+
+l_3 <- list(1, "B", 3)
+l_3
+
+# Inspecting lists
+
+is.list(l_3)  # a list
+is.list(1:3)  # a vector
+is.list("A")
+str(l_3)
+
+# Accessing list elements
+
+l_2[2] 
+l_2[[2]] 
+
+x <- list(1:3)
+x[[1]][3] # The 3rd element at the first position
+
+# C) conversion among objects
+
+df$gender <- as.factor(df$gender) 
+df$gender
+
+# convert matrix to data.frame
+matrix_data=matrix(c(1,2,3,4,5,6,7,8), nrow=4) # default byrow=FALSE
+print(matrix_data) 
+class(matrix_data)
+dataframe_data=as.data.frame(matrix_data) # convert the matrix into dataframe
+print(dataframe_data)
+class(dataframe_data)
+
+dataframe_data1 <- data.frame(a = 1:3, b = letters[10:12],
+                              c = seq(as.Date("2004-01-01"), by = "week", 
+                                      length.out = 3),
+                              stringsAsFactors = TRUE)
+dataframe_data1 
+class(dataframe_data1)
+
+matrix_data1 <- data.matrix(dataframe_data1[1:2]) # column
+class(dataframe_data1[1:2])
+
+matrix_data1
+class(matrix_data1)
+
+matrix_data2 <- data.matrix(dataframe_data1)
+matrix_data2
+
+# convert dataframe to array
+
+df1 <- data.frame(x = 1:5, y = 5:1)
+df1
+
+df2 <- data.frame(x = 11:15,y = 15:11)
+df2
+
+
+##################################################
+###### R function objects and operations #########
+##################################################
+
+# 01- Built-in Functions
 # https://www.datacamp.com/doc/r/functions
 
 # Numeric Functions
@@ -82,18 +336,21 @@ mean(x, trim=0,na.rm= FALSE )
 sum(x)
 range(x)
 
-# Other Functions
+# Other things
 
-seq(from , to , by)
-rep(x , ntimes)
+sum(c(1, 2))
+sum(1, 2, 3, NA, na.rm = TRUE)
+paste0("hell", "o ", "world", "!")
+substr(x = "television", start = 5, stop = 10)
+?substr
 
-# B) installing and loading packages for many functions
+?filter  # 2 different packages 
 
-# finding and selecting packages
-# install.packages("packagefinder", dependencies = TRUE)
+# Indicating the filter() function of a given package: 
+?stats::filter
+?dplyr::filter
 
-library(packagefinder)
-findPackage("community ecology") 
+# 02-finding and installing packages
 
 # --from CRAN
 # Install packages by IDE or using install.packages()
@@ -117,19 +374,16 @@ findPackage("community ecology")
 #                  repos=NULL, type='source')
 
 
-# --using pak to install R packages
+library(ds4psy)  # load the package
+plot_fn()
+plot_fn(x = 1)
+plot_fn(x = 7)
 
-# first install pak package
-# install.packages("pak")
-# install.packages("pak", repos = "https://r-lib.github.io/p/pak/dev/")
+plot_fn(x = 5, y = 1)
+plot_fn(x = 5, y = 5, A = TRUE, B = FALSE, C = TRUE, 
+        D = FALSE, E = FALSE, F = FALSE,  g = "black")
 
-# Install packages from CRAN or Bioconductor
-# pak::pkg_install("clusterProfiler")
-
-# Install packages from github
-# pak::pkg_install("tomwenseleers/export")
-
-# C) using self-defined functions
+# 03-using self-defined functions
 # # https://rpubs.com/NateByers/functions
 # 
 # # Writing functions
@@ -140,16 +394,90 @@ findPackage("community ecology")
 #   average_of_values
 # }
 # 
+
+source("myMean.R") 
+
 # my_vector <- c(1, 3, 5, 2, 6, 9, 0)
 # vector_mean <- myMean(x = my_vector)
 # vector_mean
 # 
 
-# 05-installing gptstudio for help
+#############################################
+### naming objects and operating on them ####
+#############################################
 
-# install.packages("pak")
-pak::pak("usethis")
-# pak::pak("MichelNivard/gptstudio")
-usethis::edit_r_environ()
-Sys.getenv("OPENAI_API_KEY")
-gptstudio:::gptstudio_chat()
+# 01-rules for naming objects
+
+# using char, number and underscore to name objects
+
+# the names are case sensitive 
+
+o <- 10  # assign/set o to 10
+O <-  5  # assign/set O to  5
+
+o * O  
+o * 0  # Note: O differs from 0
+o / O
+O / 0
+
+length(o) # Object shape
+dim(o)
+
+mode(o) # Object type
+
+# Avoid using spaces inside variables 
+
+# naming tea_pot instead of tea pot
+
+# 02-input objects into R environment
+
+##############################################
+############ Best Practices for R ############
+##############################################
+# https://swcarpentry.github.io/r-novice-inflammation/06-best-practices-R.html
+# https://www.r-bloggers.com/2024/06/writing-r-code-the-good-way/
+
+# 01- well-organized project 
+# A well-organized directory structure helps navigating 
+# the project efficiently. It separates data, scripts, and 
+# results, making it easier to locate and manage files
+
+# project/
+#   ├── data/
+#   ├── scripts/
+#   └── results/
+
+
+# 02- Customizing Snippets for tracking
+# Starting with an annotated description of who write the
+# code and what the code does for track when you have to 
+# look at or change it in the future
+# https://blog.devgenius.io/how-to-automatically-create-headers-in-r-scripts-be69152ac23f
+
+
+# 03- Defining a relative path for import files into R and
+# export them out R environment. For example:
+
+input_file <- "data/data.csv" 
+output_file <- "data/results.csv"
+
+# 04- annotating and marking code using # or #- to set off 
+#  code sections or separate the function definitions. 
+
+input_data <- read.csv(input_file) # read input 
+sample_number <- nrow(input_data) # get number of samples 
+results <- some_other_function(input_file, 
+                               sample_number) 
+
+# 05-Proper indentation and spacing make code more readable 
+#  and maintainable
+
+vec <- c(1, 2, 3)
+
+# 06- Pipes are used for streamline code by chaining 
+#  operations in a readable manner
+
+library(dplyr)
+data %>%
+  filter(x > 1) %>%
+  summarise(mean_y = mean(y))
