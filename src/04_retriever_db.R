@@ -13,8 +13,144 @@
 cat("\014") # Clears the console
 rm(list = ls()) # Remove all variables
 
+
+#####################################################
+# 01-import data
+#####################################################
+
+# A) download.file() or read_csv() from websites
+# https://www.davidzeleny.net/anadat-r/doku.php/en:data:doubs
+
+# Set the base URL for the datasets
+
+base_url <- "https://raw.githubusercontent.com/zdealveindy/anadat-r/master/data/"
+
+datasets <- c("DoubsSpe.csv","DoubsEnv.csv","DoubsSpa.csv")  # List of datasets 
+
+# Download each dataset
+for(dataset in datasets) {
+  full_url <- paste0(base_url, dataset) # full URL of files
+  dest_file <- file.path("data/rbasic_data", dataset) # the destination
+  download.file(full_url, destfile = dest_file, mode = "wb") # Download
+  
+  cat("Downloaded:", dataset, "\n") # Print a message for complete
+}
+
+# if getting an error, check DNS (sudo vim /etc/resolv.conf)
+
+# B) using rdataretriever to download data from databases
+
+# Install rdataretriever in python environment 
+# https://github.com/ropensci/rdataretriever
+# https://rstudio.github.io/reticulate/
+
+# install.packages('reticulate') # interface to Python
+library(reticulate)
+py_config()
+# $pip install retriever # Install retriever package
+# install.packages('rdataretriever') # install rdataretriever
+library(rdataretriever)
+get_updates() # Update the available datasets
+# List the datasets available via the Retriever
+datasets()
+
+# install_csv('portal') # Install csv portal
+download('portal', 'data/data_db/portal') # [219 dataset]
+portal = fetch('portal')
+names(portal)
+head(portal$species)
+
+plot <- read.csv("data/data_db/portal/3299474")
+species <- read.csv("data/data_db/portal/3299483")
+survey <- read.csv("data/data_db/portal/5603981")
+library(tidyverse)
+glimpse(survey)
+
+# download('harvard-forest', 'data/data_db') # vector [162]
+# unzip("data/data_db/hf110-01-gis.zip")
+# 
+# library(sf)
+# sf <- st_read(unzip("data/data_db/hf110-01-gis.zip", #read .shp into R
+#                     "Harvard_Forest_Properties_GIS_Layers/stands_1937.shp"))
+# sf #view data 
+
+# C) loading data from R package
+
+data() # check built-in R
+data(doubs, package = "ade4")
+
+DoubsEnv <- readr::read_csv("data/rbasic_data/DoubsEnv.csv")
+DoubsEnv
+
+# Checking dataset
+
+str(DoubsEnv)
+tibble::glimpse(DoubsEnv)
+
+#####################################################
+# 02-Working on the SQLite with R
+#####################################################
+# A) working with RStudio Connections Pane
+
+# https://www.youtube.com/watch?v=id0GX4sXnyI
+# https://www.youtube.com/watch?v=0euy9b3CjuY
+# https://staff.washington.edu/phurvitz/r_sql/
+
+# // setup sqlite for rstudio's connections
+# apt install unixodbc 
+# apt install sqliteodbd
+# vim /etc/odbcinst.ini
+# vim /etc/odbc.ini
+
+# B) working with RStudio codes (dplyr)
+
+# several packages: DBI, RSQLite, tidyverse, dplyr, dbplyr
+# https://rdbsql.rsquaredacademy.com/dbplyr
+# https://datacarpentry.org/R-ecology-lesson/05-r-and-databases.html
+# download from https://github.com/weecology/portal-teachingdb/blob/master/"
+
+library(DBI)
+doubs <- DBI::dbConnect(RSQLite::SQLite(), # create or connect
+                        "data/data_db/doubs.sqlite")
+dbListTables(doubs)
+dbListFields(doubs, "DoubsEnv")
+
+# creating tables and inserting data by dbplyr
+library(dbplyr)
+dbplyr::src_dbi(doubs) # view the database
+env <- dplyr::tbl(doubs, "DoubsEnv") # Querying table
+head(env)
+library(tidyverse)
+env_clean <- env %>%
+  select(-field1) %>%
+  collect() # load into the R session
+
+dbDisconnect(doubs)
+doubs
+
+# C) import data to a sqlite database
+
+library(tidyverse) # for the read_csv()
+SPE <- read_csv("data/data_db/DoubsSpe.csv")
+ENV <- read_csv("data/data_db/DoubsEnv.csv")
+SPA <- read_csv("data/data_db/DoubsSpa.csv")
+
+# create an empty SQLite database
+library(dplyr) # link to a database by src_sqlite()
+my_db_file <- "resutls/DOUBS.sqlite"
+my_db <- src_sqlite("results/my_db_file", create = TRUE)
+my_db
+
+# copy the existing data.frames into the empty database
+copy_to(my_db, SPE, temporary = FALSE)
+copy_to(my_db, ENV, temporary = FALSE)
+copy_to(my_db, SPA, temporary = FALSE)
+
+dbDisconnect(my_db$con)
+my_db
+
 ##################################################
-# 01- Get data from an URL or a data repository
+# 01- Get data from an URL or a repository
 ##################################################
 
 # A) using download.file() or read.csv()
@@ -23,16 +159,16 @@ rm(list = ls()) # Remove all variables
 
 base_url <- "https://raw.githubusercontent.com/zdealveindy/anadat-r/master/data/"
 
-datasets <- c("DoubsSpe.csv","DoubsEnv.csv","DoubsSpa.csv")  # List of datasets 
+datasets <- c("DoubsSpe.csv","DoubsEnv.csv","DoubsSpa.csv") # List of datasets 
 
-# # Download each dataset
-# for(dataset in datasets) {
-#   full_url <- paste0(base_url, dataset) # Create a full URL for each dataset
-#   dest_file <- file.path("data/data_db", dataset) # Specify the destination 
-#   download.file(full_url, destfile = dest_file, mode = "wb") # Download the dataset
-#   
-#   cat("Downloaded:", dataset, "\n") # Print a message indicating the download is complete
-# }
+# Download each dataset
+for(dataset in datasets) {
+  full_url <- paste0(base_url, dataset) # a full URL for dataset
+  dest_file <- file.path("data/data_db", dataset) # specify destination
+  download.file(full_url, destfile = dest_file, mode = "wb") # Download
+
+  cat("Downloaded:", dataset, "\n") # Print a message after complete
+}
 
 # if getting an error, check DNS (sudo vim /etc/resolv.conf)
 
@@ -58,7 +194,6 @@ url_data
 # self-defined function for automation
 autoget_data <- function(url) { # may add the_sep = "\t"
   url <- getURL(url) 
-
   data <- read.csv(textConnection(url)) # may add sep = the_sep
   return(data)
 }

@@ -47,7 +47,7 @@ library(tidyverse)
 coordinates_geo <- read_csv("data/geo_data/coordinates_geo.csv")
 coordinates_geo
 
-# # Comparing them with georeferring by ourselves
+# # # Comparing them with georeferring by ourselves
 # load("data/geo_data/Doubs.RData",  Doubs <- new.env())
 # ls.str(Doubs)
 # latlong <- Doubs$latlong
@@ -190,7 +190,7 @@ dplyr::rename(doubs_env_spe, abund=spe.abund)
 #                                 "doubs_env_spe.shp"))
 
 ########################################################
-# 03-ESDA of spatial dependence for polygons
+# 03-ESDA of spatial dependance of polygons for ML model
 #######################################################
 
 # https://bookdown.org/lexcomber/GEOG3195/spatial-models-spatial-autocorrelation-and-cluster-analysis.html
@@ -321,11 +321,9 @@ p_geto =
   theme_minimal()
 p_geto
 
-########################################################
-# 04-Incorporating spatial autocorrelation into ML
-#######################################################
+# C) Incorporating spatial autocorrelation into ML
 
-# A) Simple Linear Regression
+# a) Simple Linear Regression
 
 formula <- "vble ~ AREA + PERIMETER + HOVAL + INC + OPEN + X + Y"
 # compute model
@@ -333,7 +331,7 @@ model1 <- lm(formula = formula, data = map)
 # view model statistics
 summary(model1)
 
-# B) Spatial Regression Models accounting for autocorrelation
+# b) Spatial Regression Models accounting for autocorrelation
 
 model2 <- spatialreg::lagsarlm( # lag model
   formula = formula, 
@@ -352,7 +350,7 @@ jtools::export_summs(model1, model2, model3) # compare to linear model
 spdep::moran.test(model2$residuals, nbw) # model2 and models Moran's I test
 spdep::moran.test(model3$residuals, nbw)
 
-# C) Geographically Weighted Regression accounting for heterogeneity
+# c) Geographically Weighted Regression accounting for heterogeneity
 # load packages
 library(SpatialML)
 library(sf)
@@ -373,133 +371,34 @@ lm(SID ~ NWB, nc1) |>
 bind_cols(nc, pr) |> names()
 
 ########################################################
-# 05-ESDA of spatial points and building a predict model
+# 04-ESDA of spatial dependence of points for ML model
 #######################################################
 
-# A) Creating Thiessen polygons from a point layer
-
-library(sf)
-Doubs <- st_read("data/geo_data/doubs_env_spe.shp")
-Doubs_nogeometry <- st_drop_geometry(Doubs)
-
-coords <- read.csv("data/geo_data/coordinates_utm.csv")
-coordsxy <- coords[, -1]
-doubs_xy_env_spe <- cbind(Doubs_nogeometry, coordsxy)
-doubs_sf <- st_as_sf(doubs_xy_env_spe, 
-                     coords = c("x", "y"))|>
-  st_set_crs(32631)
-doubs_sf <- doubs_sf |>
-  dplyr::mutate(lon = sf::st_coordinates(doubs_sf$geometry)[,1],
-                lat = sf::st_coordinates(doubs_sf$geometry)[,2])
-
-# st_write(doubs_sf, "data/geo_data/doubs_sf.shp", append=FALSE)
-
-# construct voronoi or Thiessen polygons
-library(dplyr)
-doubs_sf <- st_read("data/geo_data/doubs_sf.shp")
-doubs_sfxy <- doubs_sf |>
-  rename(x=lon, y = lat)
-
-library(deldir)
-library(sp)
-vtess <- deldir(doubs_sfxy$x, doubs_sfxy$y)
-plot(vtess, wlines="tess", wpoints="none",
-     lty=1)
-
-voronoipolygons = function(thiess) {
-  w = tile.list(thiess)
-  polys = vector(mode='list', length=length(w))
-  for (i in seq(along=polys)) {
-    pcrds = cbind(w[[i]]$x, w[[i]]$y)
-    pcrds = rbind(pcrds, pcrds[1,])
-    polys[[i]] = Polygons(list(Polygon(pcrds)), ID=as.character(i))
-  }
-  SP = SpatialPolygons(polys)
-  voronoi = SpatialPolygonsDataFrame(SP, data=data.frame(dummy = seq(length(SP)), row.names=sapply(slot(SP, 'polygons'), 
-                                                                                                   function(x) slot(x, 'ID'))))
-}
-
-v <- voronoipolygons(vtess)
-plot(v)
-class(v)
-vtess_sf <- st_as_sf(v)
-plot(vtess_sf$geometry)
-
-# B) Contiguity-based spatial weights for Thiessen polygons
-st_queen <- function(a, b = a) st_relate(a, b, pattern = "F***T****")
-queen_sgbp <- st_queen(vtess_sf) # convert to class nb
-as.nb.sgbp <- function(x, ...) {
-  attrs <- attributes(x)
-  x <- lapply(x, function(i) { if(length(i) == 0L) 0L else i } )
-  attributes(x) <- attrs
-  class(x) <- "nb"
-  x
-}
-
-queen_nb <- as.nb.sgbp(queen_sgbp)
-
-# the distribution of the number of neighbors
-library(spdep)
-queen_nb_card <- card(queen_nb)
-library(ggplot2)
-ggplot() +
-  geom_histogram(aes(x=queen_nb_card)) +
-  xlab("Number of Neighbors")
-summary(queen_nb)
-
-plot(queen_nb,coords, lwd=.2, col="blue", cex = .5)
-
-library(sfdep)
-doubs_lags <- doubs_sfxy |> 
-  mutate(
-    nb = st_contiguity(vtess_sf$geometry),
-    wt = st_weights(queen_nb),
-    vtess_lag = st_lag(doubs_sfxy$spe_abund, nb, wt)
-  ) 
-
-library(ggplot2)
-gg_doubs_lag <- ggplot(doubs_lags, aes(fill = doubs_sfxy$spe_abund)) +
-  geom_sf(color = "black", lwd = 0.15) +
-  scale_fill_viridis_c(limits = range(doubs_sfxy$spe_abund)) +
-  theme_void()
-gg_doubs_lag 
-
-gg_doubs_obs <- ggplot(doubs_sfxy, aes(fill = doubs_sfxy$spe_abund)) +
-  geom_sf(color = "black", lwd = 0.15) +
-  scale_fill_viridis_c(limits = range(doubs_sfxy$spe_abund)) +
-  theme_void()
-gg_doubs_obs
-
-patchwork::wrap_plots(gg_doubs_obs, gg_doubs_lag)
-
-# C) Global and Local spatial autocorrelation, clusters
-
-##-----------------------------------------------------
-## As for the points
+# A) creating Thiessen/voronoi polygons as an sf object
 # https://spatialanalysis.github.io/handsonspatialdata/global-spatial-autocorrelation-1.html
 
+library(tmap)
 library(sf)
 library(spdep)
 library(ggplot2)
-library(deldir)
-library(robustHD)
-library(Hmisc)
-library(tidyverse)
-library(gap)
-library(gridExtra)
-library(geodaData)
 
-doubs_sf <- st_read("data/geo_data/doubs_sf.shp")
+doubs_sf <- st_read("data/geo_data/doubs_env_spe.shp")
+
+# Extract coordinates
+coords <- st_coordinates(doubs_sf)
 doubs_sfxy <- doubs_sf |>
-  rename(x=lon, y = lat)
+  mutate(
+    lon = coords[,1],  # Extract longitude
+    lat = coords[,2]   # Extract latitude
+  )
 
-# A) constructING Thiessen/voronoi polygons from point data
-
-vtess <- deldir(doubs_sfxy$x, doubs_sfxy$y)
+library(deldir)
+vtess <- deldir(doubs_sfxy$lon, 
+                doubs_sfxy$lat) # voronoi polygons
 plot(vtess, wlines="tess", wpoints="none",
      lty=1)
 
-voronoipolygons = function(thiess) {
+voronoipolygons_sp = function(thiess) {# convert voronoi polygons to sp
   w = tile.list(thiess)
   polys = vector(mode='list', length=length(w))
   for (i in seq(along=polys)) {
@@ -512,22 +411,20 @@ voronoipolygons = function(thiess) {
                                                                                                    function(x) slot(x, 'ID'))))
 }
 
-v <- voronoipolygons(vtess)
-plot(v)
+vtess_sp <- voronoipolygons_sp(vtess)
+plot(vtess_sp)
 
-# further convert sp to sf 
-vtess_sf <- st_as_sf(v)
+vtess_sf <- st_as_sf(vtess_sp) # converting sp to sf 
 plot(vtess_sf$geometry)
 
-# creating the queen contiguity
+# B) computing the lagged means for lagged mean plot
+# creating the queen contiguity for nb and w
 
 st_queen <- function(a, b = a) st_relate(a, b, pattern = "F***T****")
 queen_sgbp <- st_queen(vtess_sf)
 class(queen_sgbp)
 
-# converts type sgbp to nb
-
-as_nb_sgbp <- function(x, ...) {
+as_nb_sgbp <- function(x, ...) {# converting sgbp to nb
   attrs <- attributes(x)
   x <- lapply(x, function(i) { if(length(i) == 0L) 0L else i } )
   attributes(x) <- attrs
@@ -535,65 +432,90 @@ as_nb_sgbp <- function(x, ...) {
   x
 }
 
-queen_nb <- as_nb_sgbp(queen_sgbp)
+queen_nb <- as_nb_sgbp(queen_sgbp) # convert neighbor types 
 
-queen_weights <- nb2listw(queen_nb) # get row standardized weights
+queen_weights <- nb2listw(queen_nb) # from neighbors to weights
 
-# B) Calculating global moran I and testing significance
+# computing the lagged means for plot 
+# https://bookdown.org/lexcomber/GEOG3195/spatial-models-spatial-autocorrelation-and-cluster-analysis.html
 
-moran <- moran(doubs_sfxy$spe_abund, 
-               queen_weights, length(queen_nb), 
-               Szero(queen_weights))
-moran$I 
+doubs_sfxy$lagged.means <- lag.listw(queen_weights, doubs_sfxy$spe_abund)
+plot_lm = 
+  ggplot(data = doubs_sfxy, aes(x = spe_abund, y = lagged.means)) +
+  geom_point(shape = 1, alpha = 0.5) +
+  geom_hline(yintercept = mean(doubs_sfxy$lagged.means), lty = 2) +
+  geom_vline(xintercept = mean(doubs_sfxy$spe_abund), lty = 2) +
+  geom_abline() +
+  coord_equal()
+plot_lm
 
+# C) Moran plot and test if statistically significant
+# http://www.geo.hunter.cuny.edu/~ssun/R-Spatial/spregression.html
 
-doubs_sfxy$lagged_spe_abund <- lag.listw(queen_weights,
-                                         doubs_sfxy$spe_abund)
-doubs_sfxy$lagged_spe_abund
+spdep::moran.test(doubs_sfxy$spe_abund, 
+                  queen_weights, 
+                  zero.policy = TRUE)
 
-# standardized lag and spe_abund variables
+spdep::moran.plot(doubs_sfxy$spe_abund, 
+                  queen_weights, 
+                  zero.policy = TRUE, 
+                  xlab = 'sampling point',
+                  ylab = 'Lagged spe-abund (of Neighbors)',
+                  pch=20)
 
-doubs_sfxy$standardized_spe_abund <- 
-  robustHD::standardize(doubs_sfxy$spe_abund)
-doubs_sfxy$standardized_lag_spe_abund <- 
-  robustHD::standardize(doubs_sfxy$lagged_spe_abund)
+# # C) Global moran's I and spatial lag for Moran's plot
+# 
+# moran <- moran(doubs_sfxy$spe_abund, 
+#                queen_weights, length(queen_nb), 
+#                Szero(queen_weights))
+# 
+# moran$I # Moran’s I  
+# 
+# doubs_sfxy$lagged_spe_abund <- lag.listw(queen_weights,
+#                                          doubs_sfxy$spe_abund)
+# doubs_sfxy$lagged_spe_abund
+# 
+# doubs_sfxy$standardized_spe_abund <- # standardized lag and spe_abund
+#   robustHD::standardize(doubs_sfxy$spe_abund)
+# doubs_sfxy$standardized_lag_spe_abund <- 
+#   robustHD::standardize(doubs_sfxy$lagged_spe_abund)
+# 
+# ggplot(data = doubs_sfxy, aes(x=standardized_spe_abund, 
+#                               y = standardized_lag_spe_abund)) +
+#   geom_point() +
+#   geom_smooth(method = "lm", se = FALSE) +
+#   geom_hline(yintercept = 0, lty = 2) +
+#   geom_vline(xintercept = 0, lty = 2) +
+#   xlim(-10,10) +
+#   ylim(-10,10) + 
+#   ggtitle("global moran scatter plot")
+# 
+# # test if global Moran’s I statistic are significant
+# # https://rpubs.com/laubert/SACtutorial
+# 
+# spe_abund_gI <- moran.test(doubs_sfxy$spe_abund, 
+#                            queen_weights, zero.policy = TRUE)
+# spe_abund_gI
+# 
+# moran.range <- function(lw) {
+#   wmat <- listw2mat(lw)
+#   return(range(eigen((wmat + t(wmat))/2)$values))
+# }
+# 
+# moran.range(queen_weights) # random if between min-max, else cluster or dispersed
+# 
+# #Calculate Z-score
+# mI <- spe_abund_gI$estimate[[1]] # global MI
+# eI <- spe_abund_gI$estimate[[2]] #Expected MI
+# var <- spe_abund_gI$estimate[[3]] #Variance of values
+# zscore <- (mI-eI)/var**0.5 # -1.96 <zscore <1.96, no spatial correlation
 
-ggplot(data = doubs_sfxy, aes(x=standardized_spe_abund, 
-                              y = standardized_lag_spe_abund)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE) +
-  geom_hline(yintercept = 0, lty = 2) +
-  geom_vline(xintercept = 0, lty = 2) +
-  xlim(-10,10) +
-  ylim(-10,10) + 
-  ggtitle("global moran scatter plot")
-
-# test if Moran’s I statistic are statistically significant
-# https://rpubs.com/laubert/SACtutorial
-spe_abund_gI <- moran.test(doubs_sfxy$spe_abund, 
-                           queen_weights, zero.policy = TRUE)
-spe_abund_gI
-
-moran.range <- function(lw) {
-  wmat <- listw2mat(lw)
-  return(range(eigen((wmat + t(wmat))/2)$values))
-}
-
-# I is between min-max, then random, otherwise cluster or dispersed
-
-moran.range(queen_weights) 
-
-#Calculate Z-score
-mI <- spe_abund_gI$estimate[[1]] # global MI
-eI <- spe_abund_gI$estimate[[2]] #Expected MI
-var <- spe_abund_gI$estimate[[3]] #Variance of values
-zscore <- (mI-eI)/var**0.5 # -1.96 <zscore <1.96, no spatial correlation
-
-# C) Local Spatial Autocorrelation (hot-spots and outliers) and test
+# D) Local Spatial Autocorrelation and test
+# http://www.geo.hunter.cuny.edu/~ssun/R-Spatial/spregression.html#spatial-autocorrelation
 
 spe_abund_lI <- localmoran(doubs_sfxy$spe_abund, queen_weights)
 
-# Extracting Local Moran’s I and appending it to the dataset
+# Extracting Moran’s I and appending to dataset
 
 doubs_sfxy$lI <- spe_abund_lI[,1]
 doubs_sfxy$ElI <- spe_abund_lI[,2]
@@ -601,26 +523,11 @@ doubs_sfxy$VarlI <- spe_abund_lI[,3]
 doubs_sfxy$ZlI <- spe_abund_lI[,4] # standard deviate of lI
 doubs_sfxy$PlI <- spe_abund_lI[,5]
 
-# visualizing local moran's I
-
-map_lI <- tm_shape(doubs_sfxy) + tm_lines()
-tm_sf(col = "ZlI",
-      title = "Local Moran's I - spe_abund",
-      style = "fixed",
-      breaks = c(-Inf, -1.96, 1.96, Inf),
-      labels = c("Negative SAC", "Random SAC", "Positive SAC"),
-      palette = "RdBu", n = 3,
-      midpoint = NA,
-      border.alpha = 0.3) +
-  map_lI
-
-# http://www.geo.hunter.cuny.edu/~ssun/R-Spatial/spregression.html#local-indicators-of-spatial-autocorrelation
-
 # derive the cluster/outlier types 
 significanceLevel <- 0.05
 meanVal <- mean(doubs_sfxy$spe_abund)
 
-spe_abund_lI %>% tibble::as_tibble() %>%
+Lisa_coType <- spe_abund_lI %>% tibble::as_tibble() %>%
   magrittr::set_colnames(c("Ii","E.Ii","Var.Ii","Z.Ii","Pr()")) %>%
   dplyr::mutate(coType = dplyr::case_when(
     `Pr()` > 0.05 ~ "Insignificant",
@@ -630,73 +537,13 @@ spe_abund_lI %>% tibble::as_tibble() %>%
     `Pr()` <= 0.05 & Ii < 0 & doubs_sfxy$spe_abund < meanVal ~ "LH"
   ))
 
-## Spatial outliers detection
-## https://gis.stackexchange.com/questions/219255/spatial-outliers-detection-in-r
-#  
-library(sp)
-library(spdep) # create spatial weights matrix objects
-library(RANN) # nearest neighbors for Euclidean metric
-library(spatialEco) # spatial data manipulation
+# Now add this coType to original sf
+doubs_sfxy$coType <- Lisa_coType$coType %>% 
+  tidyr::replace_na("Insignificant")
 
-# looking at the modified z-score on a-spatial
+ggplot(doubs_sfxy) +
+  geom_sf(aes(fill=coType),color = 'lightgrey') +
+  scale_fill_manual(values = c('red','brown','NA','blue','cyan'), name='Clusters & \nOutliers') +
+  labs(title = "fish level")
 
-DES_sf <- st_read("data/geo_data/doubs_env_spe.shp")
-DES_sp <- as(DES_sf, "Spatial") # convert sf to sp
-names(DES_sp)
-
-# calculating global outliers and local z-score and variance
-
-(DES_sp$Zscore <- # global outliers
-    spatialEco::outliers(DES_sp$spe_abund))  
-spplot(DES_sp, "Zscore", 
-       col.regions=cm.colors(10))
-
-dnn <- RANN::nn2(coordinates(DES_sp), # local outliers
-                 searchtype="radius", 
-                 radius = 1000)$nn.idx
-var_spe_abund <- rep(NA,nrow(DES_sp))
-z_spe_abund <- rep(NA,nrow(DES_sp))  
-
-for(i in 1:nrow(dnn)){
-  dnn.idx <- dnn[i,] 
-  var.spe_abund[i] <- var(DES_sp[dnn.idx[dnn.idx != 0],]$spe_abund, na.rm=TRUE)
-  z.spe_abund[i] <- outliers(DES_sp[dnn.idx[dnn.idx != 0],]$spe_abund)[1]
-}
-
-var.spe_abund[!is.finite(var.spe_abund)] <- 0 
-z.spe_abund[!is.finite(z.spe_abund)] <- 0 
-
-DES_sp$var.spe_abund <- var.spe_abund
-spplot(DES_sp, "var.spe_abund", col.regions=cm.colors(10))
-
-DES_sp$z.spe_abund <- z.spe_abund
-spplot(DES_sp, "z.spe_abund", col.regions=cm.colors(10))
-
-# local autocorrelation (Local Moran's-I or LISA)
-
-all.linked <- 
-  max(unlist(nbdists(knn2nb(knearneigh(coordinates(DES_sp))), 
-                     coordinates(DES_sp))))
-nb <- dnearneigh(DES_sp, 0, all.linked)
-
-mI <- localmoran(DES_sp@data[,"spe_abund"], nb2listw(nb, style="W"))
-LocalI <- DES_sp
-LocalI@data <- data.frame(ID=rownames(LocalI@data), as.data.frame(mI))
-names(LocalI@data)[6] <- "Pr"
-spplot(LocalI, "Z.Ii", xlab="Local Morans-I", col.regions=topo.colors(30))   
-
-cat(nrow( LocalI[LocalI@data[,"Pr"] < 0.05 ,]), "obs of", 
-    nrow(LocalI), "are significant at p=0.05","\n")
-
-plot(LocalI, pch=19)
-points(LocalI[which(LocalI$Pr <= 0.05),], 
-       pch=19,col="red") # Red=hot spots or spatial outliers
-
-LocalI@data <- 
-  data.frame(LocalI@data, 
-             HotSpots=ifelse(mI[,5] <= 0.05 & mI[,4] >= mean(mI[,4]), 1, 0) )
-LocalI@data$HotSpots <- as.factor(LocalI@data$HotSpots)
-
-spplot(LocalI, "HotSpots", 
-       xlab="Local Moran’s-I Hot Spots", 
-       col.regions=c("blue","red"))
+# E) Incorporating spatial autocorrelation into ML

@@ -1,40 +1,31 @@
 # --------------------------------------------
 # Script Name: Machine learning
-# Purpose:     The script will demonstrate what machine learning is
-#              and how we build it for our own data.
+# Purpose:     The script will show how machine learning
+#              works and how we build with our own data.
 
 # Author:     Fanglin Liu
 # Email:      flliu315@163.com
 # Date:       2025-02-28
 #
 # --------------------------------------------
-cat("\014") # Clears the console
+cat("\014") # Clears the R console
 rm(list = ls()) # Remove all variables
 
-###################################################
-# 01-From a statistic model to a machine learning
-###################################################
-# A) least square algorithm
+##############################################
+# 01-From statistic models to machine learning
+##############################################
+# A) least square algorithm (statistic model)
 example1 <- read.csv("data/ml_data/example1.csv", row.names = 1)
-example1
-
-plot(y~x, data = example1, main="Scatter Plot with Line", xlab="X values", ylab="Y values")
+x <- example1$x
+y <- example1$y
+plot(y ~ x, data = example1, main="Scatter Plot with Line", 
+     xlab = "X-axis", ylab = "Y-axis")
 abline(lm(y ~ x))
 
 lm_model <- lm(y~x, data = example1)
-# coef(lm_model) 
 summary(lm_model)
 
-# x_bar <- mean(x) # calculate mean of independent variable
-# y_bar <- mean(y) # calculate mean of dependent variable
-# 
-# slope <- sum((x - x_bar)*(y - y_bar))/sum((x - x_bar)^2) # calculate sum of differences between x & y, and divide by sum of squares of x
-# slope
-# 
-# intercept <- y_bar - (slope * x_bar) # calculate difference of y_bar across the linear predictor
-# intercept
-
-# B) Gradient descent algorithm
+# B) Gradient descent algorithm (machine learning)
 
 # squared error cost function
 cost <- function(X, y, theta) {
@@ -89,24 +80,27 @@ points(X1[Class=="0"], X2[Class=="0"], col="blue", pch=19)
 points(X1[Class=="1"], X2[Class=="1"], col="red", pch=19)
 
 # calculate Gini Impurity to decide The potential splits
+min(X1)
+max(X1)
 Predictor1test <- seq(from = 0, to = 4, by = 0.1) # < min(x1) and >max(x1)
 length(Predictor1test)
 Predictor2test <- seq(from =0, to = 3, by = 0.1) 
 length(Predictor2test)
 
-# Function to calculate the proportion of observations in the split
+# Function to calculate the proportion of obs in the split
 CalculateP <- function(i, index, m, k) { 
   if(m=="L") { # region (m) which match to class (k) 
-    Nm <- length(df$Class[which(df[,index] <= i)]) # The number of observations in the split region Rm
-    Count <- df$Class[which(df[,index] <= i)] == k # The number of observations that match the class k
+    Nm <- length(df$Class[which(df[,index] <= i)]) # The number of obs in the region Rm
+    Count <- df$Class[which(df[,index] <= i)] == k # The number of obs that match the class k
   } else {
     Nm <- length(df$Class[which(df[,index] > i)])
     Count <- df$Class[which(df[,index] > i)] == k
   } 
   P <- length(Count[Count==TRUE]) / Nm # Proportion calculation
-  return(c(P,Nm)) # Returns both the porportion and the number of observations
+  return(c(P,Nm)) # Returns the proportion and the number of obs
 }
-CalculateGini <- function(x, index) { # Function to calculate the Gini Impurity
+
+CalculateGini <- function(x, index) { # calculate the Gini Impurity
   Gini <- NULL # Create the Gini variables
   for(i in x) {
     pl0 <- CalculateP(i, index, "L", 0) # Proportion in the left region with class 0
@@ -123,6 +117,7 @@ CalculateGini <- function(x, index) { # Function to calculate the Gini Impurity
 Gini <- CalculateGini(Predictor1test, 2)
 Predictor1test_gini <- cbind.data.frame(Predictor1test, Gini)
 Predictor1test_gini
+
 library(ggplot2)
 
 ggplot(data = Predictor1test_gini, aes(x = Predictor1test, y = Gini)) +
@@ -277,9 +272,9 @@ ggplot() +
   geom_hline(yintercept = tree_rmse, color = "red", linetype = "dashed") +
   geom_hline(yintercept = rf_rmse, color = "blue", linetype = "dashed") 
 
-########################################
+##########################################
 ## 04-build tree models with caret package
-########################################
+##########################################
 # https://towardsdatascience.com/create-predictive-models-in-r-with-caret-12baf9941236
 
 # first take a look at the algorithms
@@ -293,6 +288,7 @@ modelLookup("gbm")
 # load data
 data <- read.csv("data/ml_data/dickcissel.csv", 
                  stringsAsFactors = TRUE)
+
 # Split the data into training and testing sets
 set.seed(123)
 trainIndex <- createDataPartition(data$abund, p = 0.7, 
@@ -376,3 +372,4 @@ summary(models_compare)
 scales <- list(x=list(relation="free"), 
                y=list(relation="free"))
 bwplot(models_compare, scales=scales)
+

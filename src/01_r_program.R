@@ -15,7 +15,7 @@ rm(list = ls()) # Remove all variables
 # https://bookdown.org/manishpatwal/bookdown-demo/list-in-r.html
 
 #######################################################
-###### basic operations of R ##########################
+################ I. R and RStudio #####################
 #######################################################
 # 01-starting RStudio and configure its appearance
 # and introduce RStudio panes and their functions
@@ -51,14 +51,14 @@ x > y
 TRUE & FALSE # "&" is Logical AND
 TRUE | FALSE # “|” is for Logical OR
 
-# 03-basic operation via R editor (another way)
+# 03-basic operation via RStuio (another way)
 
 # open editor: File > new file > R script
 # repeat above in the RStuido editor and run
 # save the script in a given folder
  
 ##################################################
-########## R data objects and operations #########
+########## II. R data objects and operation ######
 ##################################################
 
 # 01- data types
@@ -100,7 +100,7 @@ class(1 + 2i)
 # These operations can be repeated in the RStudio script
 # editor:
 
-# click File – New File – R Script
+# click File –> New File –> R Script
 
 # 02- data objects
 # https://www.geeksforgeeks.org/r-objects/
@@ -298,9 +298,14 @@ df1
 df2 <- data.frame(x = 11:15,y = 15:11)
 df2
 
+Array1 <- array(data = c(unlist(df1),  unlist(df2)),
+                dim = c(5, 2, 2),
+                dimnames = list(rownames(df1),
+                                colnames(df1)))
+Array1 
 
 ##################################################
-###### R function objects and operations #########
+###### III. R function objects and operations ####
 ##################################################
 
 # 01- Built-in Functions
@@ -344,13 +349,7 @@ paste0("hell", "o ", "world", "!")
 substr(x = "television", start = 5, stop = 10)
 ?substr
 
-?filter  # 2 different packages 
-
-# Indicating the filter() function of a given package: 
-?stats::filter
-?dplyr::filter
-
-# 02-finding and installing packages
+# 02- installing and loading packages
 
 # --from CRAN
 # Install packages by IDE or using install.packages()
@@ -375,13 +374,21 @@ substr(x = "television", start = 5, stop = 10)
 
 
 library(ds4psy)  # load the package
-plot_fn()
+plot_fn() # check the parameters
 plot_fn(x = 1)
 plot_fn(x = 7)
 
 plot_fn(x = 5, y = 1)
 plot_fn(x = 5, y = 5, A = TRUE, B = FALSE, C = TRUE, 
         D = FALSE, E = FALSE, F = FALSE,  g = "black")
+
+library(tidyverse)
+
+?filter  # 2 different packages 
+
+# Indicating the filter() function of a given package: 
+?stats::filter
+?dplyr::filter
 
 # 03-using self-defined functions
 # # https://rpubs.com/NateByers/functions
@@ -402,9 +409,23 @@ source("myMean.R")
 # vector_mean
 # 
 
-#############################################
-### naming objects and operating on them ####
-#############################################
+source("src/add_three.R")
+add_three(5)
+
+quadratic <- function(a, b, c){
+  root1 <- (-b + sqrt(b^2 - 4 * a * c)) / (2 * a)
+  root2 <- (-b - sqrt(b^2 - 4 * a * c)) / (2 * a)
+  root1 <- paste("x =", root1)
+  root2 <- paste("x =", root2)
+  ifelse(root1 == root2, return(root1), return(c(root1, root2)))
+}
+
+quadratic(1, 6, 9)
+quadratic(1, -8, 15)
+
+################################################
+## IV. naming objects and operating on them ####
+################################################
 
 # 01-rules for naming objects
 
@@ -432,7 +453,7 @@ mode(o) # Object type
 # 02-input objects into R environment
 
 ##############################################
-############ Best Practices for R ############
+########### V. Best Practices for R ##########
 ##############################################
 # https://swcarpentry.github.io/r-novice-inflammation/06-best-practices-R.html
 # https://www.r-bloggers.com/2024/06/writing-r-code-the-good-way/
