@@ -276,7 +276,7 @@ ggplot() +
 ## 04-build tree models with caret package
 ##########################################
 # https://towardsdatascience.com/create-predictive-models-in-r-with-caret-12baf9941236
-
+library(caret)
 # first take a look at the algorithms
 modelnames <- paste(names(getModelInfo()), collapse=',')
 modelnames
@@ -286,37 +286,37 @@ modelLookup("rf")
 modelLookup("gbm")
 
 # load data
-data <- read.csv("data/ml_data/dickcissel.csv", 
+dickcissel <- read.csv("data/ml_data/dickcissel.csv", 
                  stringsAsFactors = TRUE)
+dim(dickcissel)
+dickcissel_clean <- na.omit(dickcissel) # Remove the rows with missing values
+dim(dickcissel_clean)
 
 # Split the data into training and testing sets
 set.seed(123)
 trainIndex <- createDataPartition(data$abund, p = 0.7, 
                                   list = FALSE, 
-                                  times = 1)
+                                  times = 1) # a partition
 data_train <- data[trainIndex,]
 data_test <- data[-trainIndex,]
 
 # training a tree regression
 
-# Self-defining the followings for optional a model 
-# before training 
-
-# 1) self-defining pre-processing of training data
+# A) self-defining pre-processing of training data
 
 # pre-processing usually includes center and scale data
 # by defining preProcess = c('scale', 'center'), and put  
 # it into train()
 
-# 2) self-definig trControl for resampling process, and 
-# put it outside train() but cite it in train() by the
+# B) self-defining resampling process for vilidation, and 
+# putting it outside train(), citing it in train() by the
 # parameter trControl
 
 fitControl <- trainControl(method = "repeatedcv",   
                            number = 5,     # number of folds
                            repeats = 2)    # repeated ten times
 
-# self-defining way for finding hyperparameters 
+# C) self-defining way for finding hyperparameters 
 
 # there ways include tunelength (automatically),
 # tuneGrid (manually) and search = “random”, and 
