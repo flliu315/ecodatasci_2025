@@ -275,7 +275,7 @@ ggplot() +
 ##########################################
 ## 04-build tree models with caret package
 ##########################################
-# https://towardsdatascience.com/create-predictive-models-in-r-with-caret-12baf9941236
+# https://r.qcbs.ca/workshop04/book-en/multiple-linear-regression.html
 library(caret)
 # first take a look at the algorithms
 modelnames <- paste(names(getModelInfo()), collapse=',')

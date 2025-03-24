@@ -3,7 +3,10 @@
 # Purpose: Here is the script about how to conduct EDA of geodata 
 #          and model the spatial pattern, using doubs river fishes
 #          as example to show how to extract env information along 
-#          doubs river with the integration of R and QGIS.
+#          doubs river with the integration of R and QGIS. Also,
+#          writing the code includes how to create spatial lag features 
+#          using a spatial weight matrix and how to include these 
+#          spatial features in a machine learning model.
 
 # Author:     Fanglin Liu
 # Email:      flliu315@163.com
@@ -379,8 +382,10 @@ bind_cols(nc, pr) |> names()
 
 library(tmap)
 library(sf)
+library(sp)
 library(spdep)
 library(ggplot2)
+library(tidyverse)
 
 doubs_sf <- st_read("data/geo_data/doubs_env_spe.shp")
 
@@ -435,6 +440,9 @@ as_nb_sgbp <- function(x, ...) {# converting sgbp to nb
 queen_nb <- as_nb_sgbp(queen_sgbp) # convert neighbor types 
 
 queen_weights <- nb2listw(queen_nb) # from neighbors to weights
+
+# Check the spatial weights matrix
+summary(queen_weights)
 
 # computing the lagged means for plot 
 # https://bookdown.org/lexcomber/GEOG3195/spatial-models-spatial-autocorrelation-and-cluster-analysis.html
@@ -546,4 +554,48 @@ ggplot(doubs_sfxy) +
   scale_fill_manual(values = c('red','brown','NA','blue','cyan'), name='Clusters & \nOutliers') +
   labs(title = "fish level")
 
-# E) Incorporating spatial autocorrelation into ML
+# E) Spatial model with machine learning
+
+library(sf)
+library(tidyverse)
+doubs_sf <- st_read("data/geo_data/doubs_env_spe.shp")
+
+data <- doubs_sf |>
+  st_drop_geometry() |> # remove geometry
+  na.omit() |>  # omit NA
+  select(-1)
+
+str(data)
+
+# Simple Linear Regression
+library(spatialreg)
+
+formula = spe_abund ~.
+model1 <- lm(formula = formula, data = data)
+summary(model1) # degree of freedom: m =independent, n-m-1
+
+# Spatial Regression Models
+
+queen_weights <- nb2listw(queen_nb) # from neighbors to weights
+
+# lag model
+lag_model <- spatialreg::lagsarlm(
+  formula = formula, 
+  data = data, 
+  listw = queen_weights,
+  zero.policy = TRUE
+)
+
+summary(lag_model)
+
+# error model
+error_model <- spatialreg::errorsarlm(
+  formula = formula, 
+  data = data, 
+  listw = queen_weights
+)
+
+summary(error_model)
+
+# compare simple linear model with SAG models
+jtools::export_summs(model1, lag_model, error_model)
