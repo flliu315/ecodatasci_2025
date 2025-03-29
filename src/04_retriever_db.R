@@ -14,7 +14,7 @@ cat("\014") # Clears the console
 rm(list = ls()) # Remove all variables
 
 #####################################################
-# 01-import data
+# 01- Get data from an URL or a repository
 #####################################################
 
 # A) download.file() or read_csv() from websites
@@ -31,7 +31,6 @@ for(dataset in datasets) {
   full_url <- paste0(base_url, dataset) # full URL of files
   dest_file <- file.path("data/rbasic_data", dataset) # the destination
   download.file(full_url, destfile = dest_file, mode = "wb") # Download
-  
   cat("Downloaded:", dataset, "\n") # Print a message for complete
 }
 
@@ -44,7 +43,7 @@ for(dataset in datasets) {
 # https://rstudio.github.io/reticulate/
 
 # install.packages('reticulate') # interface to Python
-library(reticulate)
+library(reticulate) # run in virtual env!!!
 py_config()
 # $pip install retriever # Install retriever package
 # install.packages('rdataretriever') # install rdataretriever
@@ -72,11 +71,6 @@ glimpse(survey)
 # sf <- st_read(unzip("data/data_db/hf110-01-gis.zip", #read .shp into R
 #                     "Harvard_Forest_Properties_GIS_Layers/stands_1937.shp"))
 # sf #view data 
-
-# C) loading data from R package
-
-data() # check built-in R
-data(doubs, package = "ade4")
 
 DoubsEnv <- readr::read_csv("data/rbasic_data/DoubsEnv.csv")
 DoubsEnv
@@ -109,25 +103,25 @@ tibble::glimpse(DoubsEnv)
 # download from https://github.com/weecology/portal-teachingdb/blob/master/"
 
 library(DBI)
-doubs <- DBI::dbConnect(RSQLite::SQLite(), # create or connect
+conn <- DBI::dbConnect(RSQLite::SQLite(), # create or connect
                         "data/data_db/doubs.sqlite")
-dbListTables(doubs)
-dbListFields(doubs, "DoubsEnv")
+dbListTables(conn)
+dbListFields(conn, "DoubsEnv")
 
 # creating tables and inserting data by dbplyr
 library(dbplyr)
-dbplyr::src_dbi(doubs) # view the database
-env <- dplyr::tbl(doubs, "DoubsEnv") # Querying table
+dbplyr::src_dbi(conn) # view the database
+env <- dplyr::tbl(conn, "DoubsEnv") # Querying table
 head(env)
 library(tidyverse)
-env_clean <- env %>%
-  select(-field1) %>%
+env_clean <- env |>
+  select(-field1) |>
   collect() # load into the R session
 
-dbDisconnect(doubs)
-doubs
+dbDisconnect(conn)
+conn
 
-# C) import data to a sqlite database
+# C) export data to a sqlite database
 
 library(tidyverse) # for the read_csv()
 SPE <- read_csv("data/data_db/DoubsSpe.csv")
@@ -136,9 +130,9 @@ SPA <- read_csv("data/data_db/DoubsSpa.csv")
 
 # create an empty SQLite database
 library(dplyr) # link to a database by src_sqlite()
-my_db_file <- "resutls/DOUBS.sqlite"
-my_db <- src_sqlite("results/my_db_file", create = TRUE)
-my_db
+my_sqlite <- "resutls/DOUBS.sqlite"
+my_db <- src_sqlite("results/my_sqlite", create = TRUE)
+my_db$con
 
 # copy the existing data.frames into the empty database
 copy_to(my_db, SPE, temporary = FALSE)
@@ -148,226 +142,6 @@ copy_to(my_db, SPA, temporary = FALSE)
 dbDisconnect(my_db$con)
 my_db
 
-##################################################
-# 01- Get data from an URL or a repository
-##################################################
-
-# A) using download.file() or read.csv()
-# https://www.davidzeleny.net/anadat-r/doku.php/en:data:doubs
-# Set the base URL for the datasets
-
-base_url <- "https://raw.githubusercontent.com/zdealveindy/anadat-r/master/data/"
-
-datasets <- c("DoubsSpe.csv","DoubsEnv.csv","DoubsSpa.csv") # List of datasets 
-
-# Download each dataset
-for(dataset in datasets) {
-  full_url <- paste0(base_url, dataset) # a full URL for dataset
-  dest_file <- file.path("data/data_db", dataset) # specify destination
-  download.file(full_url, destfile = dest_file, mode = "wb") # Download
-
-  cat("Downloaded:", dataset, "\n") # Print a message after complete
-}
-
-# if getting an error, check DNS (sudo vim /etc/resolv.conf)
-
-# download.file(URL, destfile = "data/data_db/download_data.csv", 
-#               method="curl")
-# download.file(URL, destfile = "data/data_db/download_data.csv", 
-#               method="libcurl")
-
-# using read.csv() or read.table()
-
-readcsv_data <- read.csv(full_url)
-head(readcsv_data)
-readtbl_data <- read.table(full_url)
-saveRDS(object = readcsv_data, file = "data/data_db/readcsv_data.RDS") 
-# readRDS("data/data_db/readcsv_data.RDS")
-
-# using the RCurl package
-library(RCurl)
-get_url <- RCurl::getURL(full_url)
-url_data <- read.csv(textConnection(get_url))
-url_data
-
-# self-defined function for automation
-autoget_data <- function(url) { # may add the_sep = "\t"
-  url <- getURL(url) 
-  data <- read.csv(textConnection(url)) # may add sep = the_sep
-  return(data)
-}
-
-autoget_data(URL)
-
-spe <- read.csv("data/data_db/DoubsSpe.csv",
-                row.names = 1) # remove X col using row.names
-
-# B) using API to access data
-## https://www.earthdatascience.org/courses/earth-analytics/get-data-using-apis/API-data-access-r/
-
-## accessing non-spatial data from web api
-
-library(ggmap)
-library(ggplot2)
-library(dplyr)
-library(rjson) # getJSON() to import data from api
-library(jsonlite)
-library(RCurl)
-
-# create a API request (url)
-
-base_url = "https://data.colorado.gov/resource/tv8u-hswn.json?"# Base URL path
-full_url = paste0(base_url, "county=Boulder", # other arguments
-                  "&$where=age between 20 and 40",
-                  "&$select=year,age,femalepopulation")
-full_url
-
-# using fromJSON (full_url) and getting errors
-
-# pop_proj_data_df <- rjson::fromJSON(full_url) # Convert JSON to data frame
-# pop_proj_data_df <- RJSONIO::fromJSON(full_url)
-# pop_proj_data_df <- jsonlite::fromJSON(full_url)
-
-# encoding URL with characters and using fromJSON() to get
-full_url_encoded <- URLencode(full_url)
-full_url_encoded
-pop_proj_data_df <- jsonlite::fromJSON(full_url_encoded)
-head(pop_proj_data_df)
-
-# pop_proj_data_df1 <- rjson::fromJSON(RCurl::getURL(full_url_encoded)) 
-# head(pop_proj_data_df1, n = 2)
-# pop_proj_df_convert1 <- do.call(rbind.data.frame, pop_proj_data_df1)
-# pop_proj_df_convert1 <- do.call(rbind.data.frame, pop_proj_data_df1)
-
-# pop_proj_data_df2 <- RJSONIO::fromJSON(full_url_encoded)
-# head(pop_proj_data_df2, n = 2)
-
-# turn columns to numeric 
-pop_proj_data_df <- pop_proj_data_df %>%
-  mutate_at(c( "age", "year", "femalepopulation"), as.numeric)
-str(pop_proj_data_df)
-
-# plot the data
-ggplot(pop_proj_data_df, aes(x = year, y = femalepopulation,
-                             group = factor(age), color = age)) + geom_line() +
-  labs(x = "Year",
-       y = "Female Population - Age 20-40",
-       title = "Projected Female Population",
-       subtitle = "Boulder, CO: 1990 - 2040")
-
-## Accessing Geodata from web API
-# https://kdvdecisions-blog.netlify.app/2020/04/18/obtaining-spatial-data-from-esri-rest-apis-in-r/
-
-library(sf)
-library(leaflet)
-library(geojsonsf)
-library(dplyr)
-library(urltools)
-
-# queried an Esri REST API and copy from browser
-
-# navigate to Esri REST APIs → EDW/EDW_ForestSystemBoundaries_01
-# → Administrative Forest Boundaries - National Extent (O) → Query
-# →  HTML describing →  API
-
-forest <- 
-  geojson_sf("https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_ForestSystemBoundaries_01/MapServer/0/query?where=FORESTNAME+LIKE+%27%25Tahoe+National%25%27&text=&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&relationParam=&outFields=*&returnGeometry=true&returnTrueCurves=false&maxAllowableOffset=&geometryPrecision=&outSR=&having=&returnIdsOnly=false&returnCountOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&gdbVersion=&historicMoment=&returnDistinctValues=false&resultOffset=&resultRecordCount=&queryByDistance=&returnExtentOnly=false&datumTransformation=&parameterValues=&rangeValues=&quantizationParameters=&featureEncoding=esriDefault&f=geojson")
-
-# take a look at the data
-
-leaflet() %>%
-  addProviderTiles("Esri.WorldStreetMap") %>%
-  addPolygons(data=forest, weight=2, color="blue")
-
-target_link <- "https://commons.wikimedia.org/wiki/Data:Doubs_River.map"
-arget_page <- read_html(target_link)
-
-# C) using rdataretriever for databases
-
-# Install rdataretriever in python environment 
-# https://github.com/ropensci/rdataretriever
-# https://rstudio.github.io/reticulate/
-
-# install.packages('reticulate') # interface to Python
-library(reticulate)
-py_config()
-# $pip install retriever # Install retriever package
-# install.packages('rdataretriever') # install rdataretriever
-library(rdataretriever)
-get_updates() # Update the available datasets
-# List the datasets available via the Retriever
-datasets()
-
-# install_csv('portal') # Install csv portal
-download('portal', 'data/DBdata/portal') # .csv data
-portal = fetch('portal')
-names(portal)
-head(portal$species)
-
-download('harvard-forest', 'data/DBdata') # vector data
-
-
-#####################################################
-# 02-Working on the SQLite with R
-#####################################################
-# A) working with RStudio Connections Pane
-
-# https://www.youtube.com/watch?v=id0GX4sXnyI
-# https://www.youtube.com/watch?v=0euy9b3CjuY
-# https://staff.washington.edu/phurvitz/r_sql/
-
-# // setup sqlite for rstudio's connections
-# apt install unixodbc 
-# apt install sqliteodbd
-# vim /etc/odbcinst.ini
-# vim /etc/odbc.ini
-
-# B) working with RStudio codes (dplyr)
-
-# several packages: DBI, RSQLite, tidyverse, dplyr, dbplyr
-# https://rdbsql.rsquaredacademy.com/dbplyr
-# https://datacarpentry.org/R-ecology-lesson/05-r-and-databases.html
-# download from https://github.com/weecology/portal-teachingdb/blob/master/"
-
-library(DBI)
-doubs <- DBI::dbConnect(RSQLite::SQLite(), # create or connect
-                          "data/data_db/doubs.sqlite")
-dbListTables(doubs)
-dbListFields(doubs, "DoubsEnv")
-
-# creating tables and inserting data by dbplyr
-library(dbplyr)
-dbplyr::src_dbi(doubs) # view the database
-env <- dplyr::tbl(doubs, "DoubsEnv") # Querying table
-head(env)
-library(tidyverse)
-env_clean <- env %>%
-  select(-field1) %>%
-  collect() # load into the R session
-
-dbDisconnect(doubs)
-doubs
-
-# C) import data to a sqlite database
-
-library(tidyverse) # for the read_csv()
-SPE <- read_csv("data/data_db/DoubsSpe.csv")
-ENV <- read_csv("data/data_db/DoubsEnv.csv")
-SPA <- read_csv("data/data_db/DoubsSpa.csv")
-
-# create an empty SQLite database
-library(dplyr) # link to a database by src_sqlite()
-my_db_file <- "resutls/DOUBS.sqlite"
-my_db <- src_sqlite("results/my_db_file", create = TRUE)
-my_db
-
-# copy the existing data.frames into the empty database
-copy_to(my_db, SPE, temporary = FALSE)
-copy_to(my_db, ENV, temporary = FALSE)
-copy_to(my_db, SPA, temporary = FALSE)
-
-dbDisconnect(my_db$con)
-my_db
 
 #################################################
 # 03-Working on PostgreSQL with R
@@ -458,6 +232,7 @@ ah <- readstata13::read.dta13("data/21600-0001-Data.dta", # read the file
 colnames(ah) <- tolower(colnames(ah)) # lowercase column names
 ah <- ah %>% 
   mutate_at(., -1, as.integer) # convert to integers except 1st column
+
 # make long
 ah1 <- ah %>% 
   pivot_longer(-aid, names_to = "varname", values_to = "val")

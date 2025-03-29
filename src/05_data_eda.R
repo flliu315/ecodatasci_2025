@@ -55,8 +55,9 @@ glimpse(doubs_query$osm_multilines)
 
 # bind into a sf object
 library(sf)
-river_sf <- bind_rows(st_cast(doubs_query$osm_lines, "MULTILINESTRING"),
-                      doubs_query$osm_multilines) %>%
+river_sf <- bind_rows(st_cast(doubs_query$osm_lines, 
+                              "MULTILINESTRING"),
+                      doubs_query$osm_multilines) |>
   select(name, osm_id, role)
 
 head(river_sf)
@@ -102,7 +103,7 @@ ggsave("data/geo_data/doubs_river.png", doubs_river,
 ##################################################
 # 02-load the Doubs dataset for a glimpse
 ##################################################
-# A) load Doubs data into R
+# A) load Doubs data from database into R
 
 # Because the dataset was uploaded into the databases
 # of PostgreSQL and sqlite, so here load it from the 
@@ -122,10 +123,11 @@ library(dplyr)
 
 con <- DBI::dbConnect(RSQLite::SQLite(), 
                       "data/data_db/doubs.sqlite")
-con1 <- DBI::dbConnect(RSQLite::SQLite(), 
-                      "results/doubs.sqlite")
-dbListTables(con1) # view the database
-dbListFields(con1, "spe") # Querying table
+
+# con1 <- DBI::dbConnect(RSQLite::SQLite(), 
+#                       "results/doubs.sqlite")
+# dbListTables(con1) # view the database
+# dbListFields(con1, "spe") # Querying table
 
 dbListTables(con) # view the database
 dbListFields(con, "DoubsSpe") # Querying table
@@ -321,16 +323,16 @@ spe_wis[1:5,2:4]
 par(mfrow=c(1,4))
 boxplot(spe_clean$LOC, sqrt(spe_clean$LOC), log1p(spe_clean$LOC), las=1, main="Simple transformation",
         names=c("raw data", "sqrt", "log"), col="bisque")
-boxplot(spe.scale$LOC, spe.relsp$LOC, las=1, main="Standardization by species",
+boxplot(spe_scale$LOC, spe_relsp$LOC, las=1, main="Standardization by species",
         names=c("max", "total"), col="lightgreen")
-boxplot(spe.hel$Neba, spe.rel$LOC, spe.norm$LOC, las=1, main="Standardization by sites",
+boxplot(spe_hel$Neba, spe_rel$LOC, spe_norm$LOC, las=1, main="Standardization by sites",
         names=c("Hellinger", "total", "norm"), col="lightblue")
-boxplot(spe.chi$LOC, spe.wis$LOC, las=1, main="Double standardization",
+boxplot(spe_chi$LOC, spe_wis$LOC, las=1, main="Double standardization",
         names=c("Chi-square", "Wisconsin"), col="orange")
 
 # C) EDA on the environment data
 library(ade4)
-doubs
+
 # Bubble Maps of Some Environmental Variables
 par(mfrow=c(1,4))
 plot(spa, asp=1, main="Altitude", pch=21, col="white",

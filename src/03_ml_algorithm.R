@@ -23,6 +23,7 @@ plot(y ~ x, data = example1, main="Scatter Plot with Line",
 abline(lm(y ~ x))
 
 lm_model <- lm(y~x, data = example1)
+lm_model
 summary(lm_model)
 
 # B) Gradient descent algorithm (machine learning)
