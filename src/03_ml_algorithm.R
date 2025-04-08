@@ -292,13 +292,13 @@ modelLookup("rf")
 modelLookup("gbm")
 
 # load data
-dickcissel <- read.csv("data/ml_data/dickcissel.csv", 
+data <- read.csv("data/ml_data/dickcissel.csv", 
                  stringsAsFactors = TRUE)
-dim(dickcissel)
-dickcissel_clean <- na.omit(dickcissel) # Remove the rows with missing values
-dim(dickcissel_clean)
+dim(data)
+head(data)
 
 # Split the data into training and testing sets
+library(caret)
 set.seed(123)
 trainIndex <- createDataPartition(data$abund, p = 0.7, 
                                   list = FALSE, 
@@ -320,7 +320,7 @@ data_test <- data[-trainIndex,]
 
 fitControl <- trainControl(method = "repeatedcv",   
                            number = 5,     # number of folds
-                           repeats = 2)    # repeated ten times
+                           repeats = 2)    # repeated two times
 
 # C) self-defining way for finding hyperparameters 
 
@@ -336,6 +336,14 @@ model_rpart <- train(abund ~ ., data = data_train,
                      tuneLength = 5,# find an optimal cp based on its 5 values
                      metric="RMSE") 
 
+# sum(is.na(data_train))  # number of missing values
+# # data_train <- na.omit(data_train) # Remove the rows with missing values
+# # or use imputation
+# # preProcess(data_train, method = c("medianImpute"))
+# 
+# fitControl <- trainControl(method = "repeatedcv",   
+#                            number = 5) # reduce size of folds
+                            
 # Predict on the test data
 predictions_rpart <- predict(model_rpart, newdata = data_test)
 
@@ -349,7 +357,7 @@ model_rf <- train(abund ~ ., data = data_train,
                   trControl = fitControl,
                   preProcess = c('scale', 'center'),
                   tuneLength = 5,
-                  metric="RMSE") 
+                  metric="RSE") 
 
 predictions_rf <- predict(model_rf, newdata = data_test)
 
