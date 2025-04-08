@@ -159,6 +159,9 @@ b <- mean(y[x>=2115])
 lines(c(80, 2115, 2115, 7000),
       c(a, a, b, b))
 
+lines(c(80, 2115, 2115, 7000), 
+      c(a, a, b, b), col = "white", lwd = 2) 
+
 # the final tree
 
 model <- tree(y ~ x)
@@ -221,7 +224,7 @@ library(ggplot2)
 library(randomForest)
 
 LR <- 0.15
-nrounds <- 30
+nrounds <- 50
 
 df <- mtcars
 x_vars1 <- names(df[2:ncol(df)])
@@ -235,6 +238,7 @@ head(df)
 df$pred_1 <- mean(df$mpg)
 df$prediction <- df$pred_1
 df$resd_1 <- (df$mpg - df$prediction)
+df
 
 rmse <- RMSE(df$mpg, df$prediction) # RMSE() of caret
 results <- data.frame("Round" = c(1), "RMSE" = c(rmse))
@@ -242,7 +246,8 @@ results <- data.frame("Round" = c(1), "RMSE" = c(rmse))
 # a for loop from ROUND 2
 
 for (i in 2:nrounds){
-  mdl <-eval(parse(text = paste0("tree(resd_", i-1, "~", x_vars, ", data=df)")))
+  mdl <-eval(parse(text = paste0("tree(resd_", i-1, "~", x_vars, ", 
+                                 data=df)")))
   df[[paste0("pred_", i)]] <- predict(mdl, df)
   
   df$prediction <- df$prediction + # here includes ROUND 1

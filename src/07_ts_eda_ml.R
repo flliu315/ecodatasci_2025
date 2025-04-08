@@ -17,7 +17,7 @@ rm(list = ls()) # Remove all variables
 # https://www.r-bloggers.com/2020/06/time-series-in-5-minutes-part-1-visualization-with-the-time-plot/#google_vignette
 # A) using ts() or zoo() to create ts
 # https://rpubs.com/ravipmum/Time_Series_Fundamentals
-mydata = runif(n = 50, min = 10, max = 45)# Create a Vector of 50 evenly observations
+mydata = runif(n = 50, min = 10, max = 45) # Create a Vector of 50 evenly observations
 mytimeseries = ts(data = mydata, 
                   start = 1956,  
                   frequency = 4)# Data starts in 1956 - quarterly
@@ -78,7 +78,7 @@ monthly_retail_tbl |>
                    .smooth      = TRUE,
                    .interactive = FALSE)
 
-# 02-pre-processing and exploratory analysis
+# 02-Exploratory analysis of timeseries
 # A) Find missing data and imputation 
 # https://www.kaggle.com/code/janiobachmann/time-series-i-an-introductory-start?scriptVersionId=53165252
 # https://business-science.github.io/timetk/articles/TK07_Time_Series_Data_Wrangling.html
@@ -495,3 +495,4 @@ monthly_retail_tbl |>
               method = 'loess') + 
   labs(title = "10-Month Forecast", x = "") +
   theme_tq()
+
