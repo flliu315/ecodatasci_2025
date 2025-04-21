@@ -215,13 +215,13 @@ dbGetInfo(doubsdata)
 # Description = My Description
 # User = doubs
 # Password = doubs
-# Database = postgres
+# Database = doubs
 # Server = 127.0.0.1
 # Port = 5432
 
-# D) save dataframes to specific schemas
+# D) saving dataframes to a specific schemas
 
-# read the doubs data into R env
+# reading the doubs data into R env
 
 library(tidyverse) # for the read_csv()
 SPE <- read_csv("data/data_db/DoubsSpe.csv")
@@ -256,13 +256,6 @@ dbGetQuery(doubsdata,# List tables in the schema
 
 dbListFields(doubsdata, c("envspespa",
                      "doubs_env")) # List fields of the table
-
-# E) save dataframes to specific schemas
-
-?dbReadTable
-doubs_spa <- dbReadTable(conn = doubsdata,
-                         name = c("envspespa",
-                                  "doubs_spa"))
 
 dbDisconnect(doubsdata)
 dbGetInfo(doubsdata)

@@ -20,37 +20,47 @@ rm(list = ls()) # Remove all variables
 
 # 01-access basic data of AOI (area of interest)
 
-# A) river data and sampling coordinates
+# A) river data and sampling point coordinates
 
 # import the .csv file of coordinate x, y
 
-doubs <- read.csv("data/data_db/DoubsSpa.csv", row.names = 1)
+doubs_xy <- read.csv("data/data_db/DoubsSpa.csv", 
+                     row.names = 1)
 
-# write.csv(doubs, "data/geo_data/coordinates_utm.csv")
+# write.csv(doubs_xy, "data/geo_data/coordinates_utm.csv")
 
-# convert these coordinates to epsg=4326 using qgis
-# // converting xy.csv to xy.png with qgis
-# "Add Layer" > "Add Delimited Text Layer" >> shp
-# "Project" > "Import/Export" > "Export map as Image" >> png
-#
-# // install geocoding and quickOSM plugins to get river map
-#    a) quickservice > metasearch > add default 
-#    b) quickOSM→waterway and river→doubs→runs
+# getting the geocoordinates of sample points using qgis
 
-# // install freehand geoferencer to georeference png
-# #  a) load rive map > AD (adding png) > geroreferencing
-#    https://www.youtube.com/watch?v=fzz8jw7Qp18  
-#    b) extracting long and lat of georefered points 
-#    https://www.youtube.com/watch?v=aEnKHx14LnU
+# // The 1st step  
+# creating coordinates_utm.csv to an image with qgis
+# Add Layer -> Add Delimited Text Layer -> 
+# Project -> Export -> Export as image (sample_points.png)
 
-# // digitizing river and smapling points 
-#    https://www.youtube.com/watch?v=ZgsXKw2ZjlA
+# loading doubs_river.geojson created in 06_data_eda
+# as reference for georeferencing the sample_points.png
+
+# // The second step 
+# a) using freehand geoferencer to georeference png
+# river map -> AD (adding png) -> geroreferencing
+# https://www.youtube.com/watch?v=fzz8jw7Qp18 
+# b) using the georeferencer  in layer
+# Layer -> # Georeferencer.. -> raster
+# https://www.youtube.com/watch?v=0CT3Un9v-6Q
+
+# // The third step
+# installing and enabling coordinate capture plugin 
+
+# Loading the Georeferenced Image into QGIS
+# Layer > Add Layer > Add Raster Layer
+# click the gear ⚙️ to choose the CRS
+# Layer > Create Layer > New Shapefile Layer
+# Toggle -> Add Point Feature -> Save edits
+# Export > Save Features As... -> AS_XY
 
 library(tidyverse)
-coordinates_geo <- read_csv("data/geo_data/coordinates_geo.csv")
-coordinates_geo
+pointcoord_geo <- read_csv("data/geo_data/pointcoord_geo.csv")
 
-# # # Comparing them with georeferring by ourselves
+# # Comparing the geo-referenced with the original
 # load("data/geo_data/Doubs.RData",  Doubs <- new.env())
 # ls.str(Doubs)
 # latlong <- Doubs$latlong
@@ -61,7 +71,7 @@ coordinates_geo
 
 # create sf object
 library(sf)
-points_sf <- read.csv("data/geo_data/coordinates_geo.csv", 
+points_sf <- read.csv("data/geo_data/pointcoord_geo.csv", 
                       sep = ",") |> # set ";" if x.y is ";"
   st_as_sf(coords=c("X","Y"), crs=4326) 
 
@@ -72,7 +82,7 @@ points_sf <- read.csv("data/geo_data/coordinates_geo.csv",
 
 ## load the shapefile of Ld Doubs rive 
 
-doubs_river <- st_read("data/geo_data/doubs_river.shp") # 05_eda
+doubs_river <- st_read("data/geo_data/doubs_river.shp") # 06_eda
 head(doubs_river)
 
 # # install.packages("remotes")
@@ -93,8 +103,8 @@ doubs_river <- sf::st_read("data/geo_data/doubs_river.shp")
 doubs_pts <- sf::st_read("data/geo_data/sample_points.shp")
 
 plot(doubs_dem, main="")
-plot(doubs_pts, add = TRUE, col = "red")
-plot(doubs_river, add = TRUE, col = "blue")
+plot(doubs_pts, add = TRUE, cex =1.8, col = "brown")
+plot(doubs_river, add = TRUE, col = "yellow")
 
 ########################################################
 # 02-extracting spatial data to add originals as predictors
