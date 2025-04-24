@@ -11,7 +11,6 @@
 # Author:     Fanglin Liu
 # Email:      flliu315@163.com
 # Date:       2025-03-09
-#
 # --------------------------------------------
 cat("\014") # Clears the console
 rm(list = ls()) # Remove all variables
@@ -27,7 +26,7 @@ rm(list = ls()) # Remove all variables
 doubs_xy <- read.csv("data/data_db/DoubsSpa.csv", 
                      row.names = 1)
 
-# write.csv(doubs_xy, "data/geo_data/coordinates_utm.csv")
+# write.csv(doubs_xy, "data/geo_data/pointcoord_utm.csv")
 
 # getting the geocoordinates of sample points using qgis
 
@@ -39,7 +38,7 @@ doubs_xy <- read.csv("data/data_db/DoubsSpa.csv",
 # loading doubs_river.geojson created in 06_data_eda
 # as reference for georeferencing the sample_points.png
 
-# // The second step 
+# // The 2nd step 
 # a) using freehand geoferencer to georeference png
 # river map -> AD (adding png) -> geroreferencing
 # https://www.youtube.com/watch?v=fzz8jw7Qp18 
@@ -47,10 +46,10 @@ doubs_xy <- read.csv("data/data_db/DoubsSpa.csv",
 # Layer -> # Georeferencer.. -> raster
 # https://www.youtube.com/watch?v=0CT3Un9v-6Q
 
-# // The third step
+# // The 3rd step
 # installing and enabling coordinate capture plugin 
 
-# Loading the Georeferenced Image into QGIS
+# Loading Georeferenced Image into QGIS
 # Layer > Add Layer > Add Raster Layer
 # click the gear ⚙️ to choose the CRS
 # Layer > Create Layer > New Shapefile Layer
@@ -89,9 +88,9 @@ head(doubs_river)
 # remotes::install_github("rspatial/geodata")
 
 # library(elevatr)
-# elevation <- get_elev_raster(doubs_river, z = 10) # z resolution
-# elevation
-# terra::writeRaster(elevation, "data/geo_data/doubs_dem.tif",
+# doubs_elev <- get_elev_raster(doubs_river, z = 10) # z resolution
+# doubs_elev
+# terra::writeRaster(doubs_elev, "data/geo_data/doubs_dem.tif",
 #                    filetype = "GTiff", overwrite = TRUE)
 
 # Visualizing river, locations and dem
@@ -99,15 +98,16 @@ head(doubs_river)
 library(terra)
 
 doubs_dem <- terra::rast("data/geo_data/doubs_dem.tif")
+terra::plot(doubs_dem, main="doubs river elevation")
+
 doubs_river <- sf::st_read("data/geo_data/doubs_river.shp")
 doubs_pts <- sf::st_read("data/geo_data/sample_points.shp")
 
-plot(doubs_dem, main="")
-plot(doubs_pts, add = TRUE, cex =1.8, col = "brown")
+plot(doubs_pts, add = TRUE, cex =1.8, col = "red")
 plot(doubs_river, add = TRUE, col = "yellow")
 
 ########################################################
-# 02-extracting spatial data to add originals as predictors
+# 02-extracting spatial features to add as predictors
 ########################################################
 ## A) set a 5-km buffer along rive
 
@@ -145,7 +145,7 @@ doubs_dem_utm_cropped = crop(doubs_dem_utm,
 plot(doubs_dem_utm_cropped)
 doubs_dem_utm_masked = mask(doubs_dem_utm_cropped,
                             doubs_river_buff)
-# 
+
 # writeRaster(doubs_dem_utm_masked, "data/geo_data/doubs_dem_crop.tif")
 
 doubs_dem_crop <- terra::rast("data/geo_data/doubs_dem_crop.tif")
@@ -173,7 +173,8 @@ topo_select <- topo_total[c("AREA", "SLOPE")] |>
   unlist() |>
   rast() #  catchment area and slope
 names(topo_select) = c("carea", "cslope") # assign names
-origin(topo_select) = origin(doubs_dem_crop) # the same origin
+origin(topo_select) <- # where grid begins
+  terra::origin(doubs_dem_crop) # the same origin
 
 topo_char = c(doubs_dem_crop, topo_select) # add dem to SpatRaster
 
@@ -188,13 +189,16 @@ dim(doubs_pts_utm)
 topo_env <- terra::extract(topo_char, doubs_pts_utm, ID = FALSE)
 
 # aggregating topo and water chemical env
+env <- read.csv("data/data_db/DoubsEnv.csv", 
+                     row.names = 1)
 
 water_env <- env
 doubs_env = cbind(doubs_pts_utm, topo_env, water_env) # convert dataframe to SpatRaster
 
 # sf::st_write(doubs_env,  paste0("data/geo_data", "/", 
 #                                 "doubs_env.shp"))
-Doubs <- load("data/geo_data/Doubs.RData", Doubs <- new.env())
+
+Doubs <- load("data/geo_data/Doubs.RData")
 Doubs
 spe 
 spe_clean <- spe[!(rowSums(spe) == 0),]
@@ -204,7 +208,7 @@ dim(spe_clean)
 library(vegan)
 # ?diversity
 N0 <- rowSums(spe_clean > 0) # Species richness
-H <- diversity(spe_clean) # Shannon entropy
+H <- vegan::diversity(spe_clean) # Shannon entropy
 N1 <- exp(H) # Shannon diversity (number of abundant species)
 N2 <- diversity(spe_clean, "inv") # Simpson diversity (number of dominant species)
 J <- H/log(N0) # Pielou evenness
@@ -212,37 +216,22 @@ E10 <- N1/N0 # Shannon evenness (Hill's ratio)
 E20 <- N2/N0 # Simpson evenness (Hill's ratio)
 (div <- data.frame(N0, H, N1, N2, E10, E20, J))
 
-spe_clean$N1 <- rowSums(spe_clean)
-spe_clean
+env_clean <- doubs_env[-8,]
 
-env
-env_clean <- env[-8,]
-latlong
-latlong_clean <- latlong[-8,]
+env_diversity <- cbind(env_clean, N1) |>
+  rename(shan_div = N1)
+class(env_diversity)
 
-xy_env_spe <- cbind(latlong_clean, env_clean, N1)
-dim(xy_env_spe)
-xy_env_spe1 <- xy_env_spe |>
-  dplyr::rename(lat = LatitudeN,
-                lon = LongitudeE,
-                shan_div = N1)
+# sf::st_write(env_diversity, paste0("data/geo_data", "/",
+#                                "env_diversity.shp"),
+#              append=FALSE)
 
-xy_env_spe_sf <- st_as_sf(xy_env_spe1,
-                          coords = c("lon", "lat"),
-                          crs = 4326) |>
-  st_transform(crs = 32631)
-
-
-sf::st_write(xy_env_spe_sf, paste0("data/geo_data", "/",
-                                "xy_env_spe.shp"))
-
-# ########################################################
-# # 03-ESDA of spatial dependence of polygons for ML model
-# #######################################################
-# 
-# # https://bookdown.org/lexcomber/GEOG3195/spatial-models-spatial-autocorrelation-and-cluster-analysis.html
-# 
-# # A) the global spatial autocorrelation 
+# # ########################################################
+# # ## Methods for ESDA and ML of spatial polygons
+# # #######################################################
+# # # https://bookdown.org/lexcomber/GEOG3195/spatial-models-spatial-autocorrelation-and-cluster-analysis.html
+# # 
+# # A) the global spatial autocorrelation
 # 
 # library(spData)
 # library(sf)
@@ -257,33 +246,33 @@ sf::st_write(xy_env_spe_sf, paste0("data/geo_data", "/",
 # # mapview(map, zcol = "vble")
 # 
 # p_vble = # create the map
-#   ggplot(map) + 
+#   ggplot(map) +
 #   geom_sf(aes(fill = map$vble)) +
 #   scale_fill_gradient2(midpoint = 0.5, low = "red", high = "blue") +
 #   theme_minimal()
 # 
-# p_vble 
+# p_vble
 # 
 # 
 # library(spdep)
-# nb <- poly2nb(map, queen = TRUE) # determine adjacency 
+# nb <- poly2nb(map, queen = TRUE) # determine adjacency
 # 
 # library(tmap)
 # # examine zero links locations
-# map$rn = rownames(map) 
+# map$rn = rownames(map)
 # tmap_mode("view")
-# tm_shape(map) + 
+# tm_shape(map) +
 #   tm_borders() +
 #   tm_text(text = "rn") +
 #   tm_basemap("OpenStreetMap")
 # tmap_mode("plot")
 # 
 # # Create a line layer showing Queen's case contiguity
-# gg_net <- nb2lines(nb,coords=st_geometry(st_centroid(map)), 
-#                    as_sf = F) 
+# gg_net <- nb2lines(nb,coords=st_geometry(st_centroid(map)),
+#                    as_sf = F)
 # # Plot the contiguity and the map layer
-# p_adj = 
-#   ggplot(map) + geom_sf(fill = NA, lwd = 0.1) + 
+# p_adj =
+#   ggplot(map) + geom_sf(fill = NA, lwd = 0.1) +
 #   geom_sf(data = gg_net, col='red', alpha = 0.5, lwd = 0.2) +
 #   theme_minimal() + labs(subtitle =  "Adj")
 # p_adj
@@ -293,14 +282,14 @@ sf::st_write(xy_env_spe_sf, paste0("data/geo_data", "/",
 # nbw <- spdep::nb2listw(nb, style = "W") # compute weight matrix from nb
 # nbw$weights[1:3]
 # map$lagged_means <- lag.listw(nbw, map$vble) # compute lagged means
-# p_lagged = 
+# p_lagged =
 #   ggplot(map) + geom_sf(aes(fill = lagged_means)) +
 #   scale_fill_gradient2(midpoint = 0.5, low = "red", high = "blue") +
 #   theme_minimal()
 # 
 # cowplot::plot_grid(p_vble, p_lagged)
 # 
-# p_lm = # create a lagged mean plot 
+# p_lm = # create a lagged mean plot
 #   ggplot(data = map, aes(x = vble, y = lagged_means)) +
 #   geom_point(shape = 1, alpha = 0.5) +
 #   geom_hline(yintercept = mean(map$lagged_means), lty = 2) +
@@ -317,14 +306,14 @@ sf::st_write(xy_env_spe_sf, paste0("data/geo_data", "/",
 # moran.range <- function(lw) {
 #   wmat <- listw2mat(lw)
 #   return(range(eigen((wmat + t(wmat))/ 2) $values))
-# } 
+# }
 # 
 # moran.range(nbw) # strongly clustered
 # 
 # # B) local spatial autocorrelation and clusters
 # 
 # # Compute the local Moran’s I
-# map$lI <- localmoran(x = map$vble, listw = nbw)[, 1] 
+# map$lI <- localmoran(x = map$vble, listw = nbw)[, 1]
 # 
 # p_lisa = # create the map
 #   ggplot(map) +
@@ -338,37 +327,37 @@ sf::st_write(xy_env_spe_sf, paste0("data/geo_data", "/",
 # map$pval <- localmoran(map$vble,nbw)[, 5]
 # map$pval
 # 
-# p_lisa_pval = 
+# p_lisa_pval =
 #   ggplot(map) +
 #   geom_sf(aes(fill= pval), lwd = 0.1) +
-#   scale_fill_gradient2(midpoint = 0.05, 
-#                        name = "p-values", 
+#   scale_fill_gradient2(midpoint = 0.05,
+#                        name = "p-values",
 #                        high = "red", low = "white") +
 #   theme_minimal()
 # 
 # p_lisa_pval # print the map
 # 
-# cowplot::plot_grid(p_lisa + theme(legend.position = "bottom"), 
+# cowplot::plot_grid(p_lisa + theme(legend.position = "bottom"),
 #           p_lisa_pval + theme(legend.position = "bottom"),
 #           ncol = 2)
 # 
 # index  = map$pval <= 0.05
-# p_vble + geom_sf(data = map[index,], fill = NA, 
+# p_vble + geom_sf(data = map[index,], fill = NA,
 #                  col = "black", lwd = 0.5)
 # 
 # # Getis-Ord G statistic
 # 
 # map$gstat <- as.numeric(localG(map$vble, nbw))
 # 
-# p_geto = 
-#   ggplot(map) + 
-#   geom_sf(aes(fill = gstat)) + 
-#   scale_fill_gradient2(midpoint = 0.5, low = "red", high = "blue", 
+# p_geto =
+#   ggplot(map) +
+#   geom_sf(aes(fill = gstat)) +
+#   scale_fill_gradient2(midpoint = 0.5, low = "red", high = "blue",
 #                        name = "G Statistic")+
 #   theme_minimal()
 # p_geto
 # 
-# # C) Incorporating spatial autocorrelation into ML
+# # C) Incorporating spatial AC and heterogeneity into ML
 # 
 # # a) Simple Linear Regression
 # 
@@ -378,17 +367,17 @@ sf::st_write(xy_env_spe_sf, paste0("data/geo_data", "/",
 # # view model statistics
 # summary(model1)
 # 
-# # b) Spatial Regression Models accounting for autocorrelation
+# # b) Spatial Regress Models accounting for spatial AC
 # 
 # model2 <- spatialreg::lagsarlm( # lag model
-#   formula = formula, 
-#   data = map, 
+#   formula = formula,
+#   data = map,
 #   listw = nbw
 # )
 # 
 # model3 <- spatialreg::errorsarlm( # error model
-#   formula = formula, 
-#   data = map, 
+#   formula = formula,
+#   data = map,
 #   listw = nbw
 # )
 # 
@@ -397,12 +386,9 @@ sf::st_write(xy_env_spe_sf, paste0("data/geo_data", "/",
 # spdep::moran.test(model2$residuals, nbw) # model2 and models Moran's I test
 # spdep::moran.test(model3$residuals, nbw)
 # 
-# # c) Geographically Weighted Regression accounting for heterogeneity
+# # c) Geographically Weighted Regress accounting for heterogeneity
 # # load packages
 # library(SpatialML)
-# library(sf)
-# library(tidyverse)
-# 
 # library(GWmodel)
 # map_sp <- map %>% # convert to sp object
 #   as_Spatial()
@@ -412,16 +398,16 @@ sf::st_write(xy_env_spe_sf, paste0("data/geo_data", "/",
 # system.file("gpkg/nc.gpkg", package="sf") |>
 #   read_sf() -> nc
 # 
-# nc1 <- nc |> mutate(SID = SID74/BIR74, NWB = NWBIR74/BIR74) 
+# nc1 <- nc |> mutate(SID = SID74/BIR74, NWB = NWBIR74/BIR74)
 # lm(SID ~ NWB, nc1) |>
 #   predict(nc1, interval = "prediction") -> pr
 # bind_cols(nc, pr) |> names()
 
 ########################################################
-# 04-ESDA of spatial dependence of points for ML model
+# 03-ESDA of spatial dependence and heterogeneity for ML
 #######################################################
 
-# A) creating Thiessen/voronoi polygons as an sf object
+# A) calculating the lagged mean and visualizing it
 # https://spatialanalysis.github.io/handsonspatialdata/global-spatial-autocorrelation-1.html
 
 library(tmap)
@@ -431,23 +417,38 @@ library(spdep)
 library(ggplot2)
 library(tidyverse)
 
-doubs_sf <- st_read("data/geo_data/xy_env_spe.shp")
+env_div <- st_read("data/geo_data/env_diversity.shp")
+plot(st_geometry(env_div))
 
-# Extract coordinates
-coords <- st_coordinates(doubs_sf)
-doubs_sfxy <- doubs_sf |>
+env_div_xy <- env_div %>% # |> does not work
   mutate(
-    lon = coords[,1],  # Extract longitude
-    lat = coords[,2]   # Extract latitude
-  )
+    x = sf::st_coordinates(.)[,1],
+    y = sf::st_coordinates(.)[,2]) 
+
+p_shandiv = # the focused variable
+  ggplot(env_div_xy) +
+  geom_sf(aes(fill = shan_div), size = 2) +
+  scale_fill_viridis_c(option = "inferno", name = "original Value") +
+  theme_minimal()
+p_shandiv 
+
+env_div_xy$rn = rownames(env_div_xy)
+tmap_mode("view")
+tm_shape(env_div_xy) +
+  tm_text(text = "rn") +
+  tm_basemap("OpenStreetMap")
+tmap_mode("plot")
+
+# creating voronoi polygons and calculating nb and w
 
 library(deldir)
-vtess <- deldir(doubs_sfxy$lon, 
-                doubs_sfxy$lat) # voronoi polygons
+?deldir
+vtess <- deldir(env_div_xy$x, 
+                env_div_xy$y) # voronoi polygons
 plot(vtess, wlines="tess", wpoints="none",
      lty=1)
 
-voronoipolygons_sp = function(thiess) {# convert voronoi polygons to sp
+voronoipolygons_sp = function(thiess) {# voronoi polygons to sp
   w = tile.list(thiess)
   polys = vector(mode='list', length=length(w))
   for (i in seq(along=polys)) {
@@ -456,8 +457,12 @@ voronoipolygons_sp = function(thiess) {# convert voronoi polygons to sp
     polys[[i]] = Polygons(list(Polygon(pcrds)), ID=as.character(i))
   }
   SP = SpatialPolygons(polys)
-  voronoi = SpatialPolygonsDataFrame(SP, data=data.frame(dummy = seq(length(SP)), row.names=sapply(slot(SP, 'polygons'), 
-                                                                                                   function(x) slot(x, 'ID'))))
+  voronoi = SpatialPolygonsDataFrame(
+    SP, 
+    data=data.frame(
+      dummy = seq(length(SP)), 
+      row.names=sapply(slot(SP, 'polygons'), 
+                       function(x) slot(x, 'ID'))))
 }
 
 vtess_sp <- voronoipolygons_sp(vtess)
@@ -466,13 +471,11 @@ plot(vtess_sp)
 vtess_sf <- st_as_sf(vtess_sp) # converting sp to sf 
 plot(vtess_sf$geometry)
 
-# B) computing the lagged means for lagged mean plot
-# creating the queen contiguity for nb and w
+st_queen <- function(a, b = a) { # Queen Contiguity Function
+  st_relate(a, b, pattern = "F***T****") # corner and boundary
+}
 
-st_queen <- function(a, b = a) st_relate(a, b, pattern = "F***T****")
-queen_sgbp <- st_queen(vtess_sf)
-class(queen_sgbp)
-
+queen_sgbp <- st_queen(vtess_sf) # Sparse Geometry Binary Predicate
 as_nb_sgbp <- function(x, ...) {# converting sgbp to nb
   attrs <- attributes(x)
   x <- lapply(x, function(i) { if(length(i) == 0L) 0L else i } )
@@ -481,167 +484,262 @@ as_nb_sgbp <- function(x, ...) {# converting sgbp to nb
   x
 }
 
-queen_nb <- as_nb_sgbp(queen_sgbp) # convert neighbor types 
+queen_nb <- as_nb_sgbp(queen_sgbp) #  Convert sgbp to nb
 
-queen_weights <- nb2listw(queen_nb) # from neighbors to weights
+queen_w <- spdep::nb2listw(queen_nb, style = "W") # from nb to weights
+queen_w$weights[1:3]
+summary(queen_w)
 
-# Check the spatial weights matrix
-summary(queen_weights)
-
-# computing the lagged means for plot 
+# computing the lagged means of shan_div 
 # https://bookdown.org/lexcomber/GEOG3195/spatial-models-spatial-autocorrelation-and-cluster-analysis.html
 
-doubs_sfxy$lagged.means <- lag.listw(queen_weights, 
-                                     doubs_sfxy$shan_div)
-plot_lm = 
-  ggplot(data = doubs_sfxy, aes(x = shan_div, y = lagged.means)) +
-  geom_point(shape = 1, alpha = 0.5) +
-  geom_hline(yintercept = mean(doubs_sfxy$lagged.means), lty = 2) +
-  geom_vline(xintercept = mean(doubs_sfxy$spe_abund), lty = 2) +
-  geom_abline() +
-  coord_equal()
-plot_lm
+env_div_xy$lagged_means_shandiv <- 
+  lag.listw(queen_w, env_div_xy$shan_div)
 
-# C) Moran plot and test if statistically significant
+p_lagged <- ggplot(env_div_xy) + 
+  geom_sf(aes(fill = lagged_means_shandiv), size = 2) +
+  scale_fill_viridis_c(option = "inferno", name = "Lagged Value") +
+  theme_minimal()
+
+cowplot::plot_grid(p_shandiv, p_lagged)
+
+# B) Global Moran's I and test if statistically significant
 # http://www.geo.hunter.cuny.edu/~ssun/R-Spatial/spregression.html
+# https://rpubs.com/laubert/SACtutorial
 
-spdep::moran.test(doubs_sfxy$shan_div, 
-                  queen_weights, 
-                  zero.policy = TRUE)
+moran.plot(x = env_div_xy$shan_div, listw = queen_w, 
+           asp = 1)
+title(main = "Global Moran's Scatter Plot")
 
-spdep::moran.plot(doubs_sfxy$shan_div, 
-                  queen_weights, 
-                  zero.policy = TRUE, 
-                  xlab = 'sampling point',
-                  ylab = 'Lagged spe-abund (of Neighbors)',
-                  pch=20)
+gI <- moran.test(x = env_div_xy$shan_div, listw = queen_w) # for Moran’s I for statistic test
 
-# # C) Global moran's I and spatial lag for Moran's plot
-# 
-# moran <- moran(doubs_sfxy$spe_abund, 
-#                queen_weights, length(queen_nb), 
-#                Szero(queen_weights))
-# 
-# moran$I # Moran’s I  
-# 
-# doubs_sfxy$lagged_spe_abund <- lag.listw(queen_weights,
-#                                          doubs_sfxy$spe_abund)
-# doubs_sfxy$lagged_spe_abund
-# 
-# doubs_sfxy$standardized_spe_abund <- # standardized lag and spe_abund
-#   robustHD::standardize(doubs_sfxy$spe_abund)
-# doubs_sfxy$standardized_lag_spe_abund <- 
-#   robustHD::standardize(doubs_sfxy$lagged_spe_abund)
-# 
-# ggplot(data = doubs_sfxy, aes(x=standardized_spe_abund, 
-#                               y = standardized_lag_spe_abund)) +
-#   geom_point() +
-#   geom_smooth(method = "lm", se = FALSE) +
-#   geom_hline(yintercept = 0, lty = 2) +
-#   geom_vline(xintercept = 0, lty = 2) +
-#   xlim(-10,10) +
-#   ylim(-10,10) + 
-#   ggtitle("global moran scatter plot")
-# 
-# # test if global Moran’s I statistic are significant
-# # https://rpubs.com/laubert/SACtutorial
-# 
-# spe_abund_gI <- moran.test(doubs_sfxy$spe_abund, 
-#                            queen_weights, zero.policy = TRUE)
-# spe_abund_gI
-# 
-# moran.range <- function(lw) {
-#   wmat <- listw2mat(lw)
-#   return(range(eigen((wmat + t(wmat))/2)$values))
-# }
-# 
-# moran.range(queen_weights) # random if between min-max, else cluster or dispersed
-# 
-# #Calculate Z-score
-# mI <- spe_abund_gI$estimate[[1]] # global MI
-# eI <- spe_abund_gI$estimate[[2]] #Expected MI
-# var <- spe_abund_gI$estimate[[3]] #Variance of values
-# zscore <- (mI-eI)/var**0.5 # -1.96 <zscore <1.96, no spatial correlation
+#Calculate Z-score
+mI <- gI$estimate[[1]] # global MI
+eI <- gI$estimate[[2]] # Expected MI
+var <- gI$estimate[[3]] # Variance of values
+zscore <- (mI-eI)/var**0.5 # -1.96 <zscore <1.96, no spatial correlation
+zscore 
 
-# D) Local Spatial Autocorrelation and test
+moran.range <- function(lw) {
+  wmat <- listw2mat(lw)
+  return(range(eigen((wmat + t(wmat))/ 2) $values))
+}
+moran.range(queen_w) # random if between, else cluster or dispersed
+
+# C) Local Spatial Autocorrelation and test
 # http://www.geo.hunter.cuny.edu/~ssun/R-Spatial/spregression.html#spatial-autocorrelation
+# https://www.kaggle.com/code/jankuper192/spatial-regression
 
-spe_div_lI <- localmoran(doubs_sfxy$shan_div, queen_weights)
+lI <- localmoran(env_div_xy$shan_div, 
+                       queen_w,
+                       zero.policy = TRUE, 
+                       na.action = na.omit)
 
-# Extracting Moran’s I and appending to dataset
+head(lI)
 
-doubs_sfxy$lI <- spe_div_lI[,1]
-doubs_sfxy$ElI <- spe_div_lI[,2]
-doubs_sfxy$VarlI <- spe_div_lI[,3]
-doubs_sfxy$ZlI <- spe_div_lI[,4] # standard deviate of lI
-doubs_sfxy$PlI <- spe_div_lI[,5]
+# Extracting Moran’s I and appending to sf 
+
+env_div_xy$lI <- lI[,1]
+env_div_xy$ElI <- lI[,2]
+env_div_xy$VarlI <- lI[,3]
+env_div_xy$ZlI <- lI[,4] # standard deviate of lI
+env_div_xy$PlI <- lI[,5]
 
 # derive the cluster/outlier types 
 significanceLevel <- 0.05
-meanVal <- mean(doubs_sfxy$spe_div)
+meanVal <- mean(env_div_xy$shan_div)
 
-Lisa_coType <- spe_abund_lI %>% tibble::as_tibble() %>%
-  magrittr::set_colnames(c("Ii","E.Ii","Var.Ii","Z.Ii","Pr()")) %>%
+library(magrittr)
+lisaRslt <- lI |>  
+  tibble::as_tibble() |>
+  magrittr::set_colnames(c("Ii","E.Ii","Var.Ii","Z.Ii","Pr()")) |>
   dplyr::mutate(coType = dplyr::case_when(
     `Pr()` > 0.05 ~ "Insignificant",
-    `Pr()` <= 0.05 & Ii >= 0 & doubs_sfxy$shan_div >= meanVal ~ "HH",
-    `Pr()` <= 0.05 & Ii >= 0 & doubs_sfxy$shan_div < meanVal ~ "LL",
-    `Pr()` <= 0.05 & Ii < 0 & doubs_sfxy$shan_div >= meanVal ~ "HL",
-    `Pr()` <= 0.05 & Ii < 0 & doubs_sfxy$shan_div < meanVal ~ "LH"
+    `Pr()` <= 0.05 & Ii >= 0 & env_div_xy$shan_div >= meanVal ~ "HH",
+    `Pr()` <= 0.05 & Ii >= 0 & env_div_xy$shan_div < meanVal ~ "LL",
+    `Pr()` <= 0.05 & Ii < 0 & env_div_xy$shan_div >= meanVal ~ "HL",
+    `Pr()` <= 0.05 & Ii < 0 & env_div_xy$shan_div < meanVal ~ "LH"
   ))
 
-# Now add this coType to original sf
-doubs_sfxy$coType <- Lisa_coType$coType %>% 
+print(lisaRslt, n =29)
+
+# Now add this coType to the original sf
+env_div_xy$coType <- lisaRslt$coType |> 
   tidyr::replace_na("Insignificant")
 
-ggplot(doubs_sfxy) +
-  geom_sf(aes(fill=coType),color = 'lightgrey') +
-  scale_fill_manual(values = c('red','brown','NA','blue','cyan'), name='Clusters & \nOutliers') +
-  labs(title = "Biodiversity level")
+# Standardize the variable and its spatial lag
+env_div_xy$z_var <- (env_div_xy$shan_div - mean(env_div_xy$shan_div)) / sd(env_div_xy$shan_div)
+env_div_xy$z_lag <- (env_div_xy$lagged_means_shandiv - mean(env_div_xy$lagged_means_shandiv)) / sd(env_div_xy$lagged_means_shandiv)
 
-# E) Spatial model with machine learning
+# Create a 'quadrant' variable to classify points based on z_var and z_lag
+env_div_xy$quadrant <- with(env_div_xy, 
+                            case_when(
+                              z_var >= 0 & z_lag >= 0 ~ "High-High (HH)",
+                              z_var < 0 & z_lag >= 0 ~ "Low-High (LH)",
+                              z_var >= 0 & z_lag < 0 ~ "High-Low (HL)",
+                              z_var < 0 & z_lag < 0 ~ "Low-Low (LL)"
+                            )
+)
+
+ggplot(env_div_xy, 
+       aes(x = z_var, y = z_lag)) + # Create LISA plot
+  geom_hline(yintercept = 0, lty = 2) +
+  geom_vline(xintercept = 0, lty = 2) +
+  geom_point(aes(color = quadrant), shape = 16, alpha = 0.7, size = 2.5) +
+  scale_color_manual(values = c(
+    "High-High (HH)" = "#E41A1C",
+    "High-Low (HL)" = "#377EB8",
+    "Low-High (LH)" = "#4DAF4A",
+    "Low-Low (LL)" = "#984EA3"
+  )) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey") +
+  coord_equal() +
+  labs(
+    title = "LISA Scatter Plot with Quadrants",
+    x = "Standardized Value (z-score)",
+    y = "Standardized Spatial Lag",
+    color = "LISA Type"
+  ) +
+  theme_minimal()
+
+ggplot(env_div_xy) +
+  geom_sf(aes(fill=coType),color = 'black') +
+  scale_fill_manual(values = c('red','brown','NA','blue','yellow'), 
+                    name='Clusters & \nOutliers') +
+  labs(title = "Shannon Diversity of Fishes")
+
+########################################################
+# 04-spatial autocorrelation and heterogeneity into ML
+#######################################################
+# A) Loading data and spatial EDA
+# https://rpubs.com/zulfiqar_stat/1131164
 
 library(sf)
 library(tidyverse)
-doubs_sf <- st_read("data/geo_data/doubs_env_spe.shp")
 
-data <- doubs_sf |>
+env_div <- st_read("data/geo_data/env_diversity.shp")
+plot(st_geometry(env_div))
+
+env_div_xy <- env_div %>%
+  mutate(
+    x = sf::st_coordinates(.)[,1],
+    y = sf::st_coordinates(.)[,2]
+    ) 
+
+env_div_df <- env_div_xy |>
   st_drop_geometry() |> # remove geometry
-  na.omit() |>  # omit NA
-  select(-1)
+  na.omit() |> # omit NA
+  subset(select = -points)
 
-str(data)
+env_div_sf <- st_as_sf(env_div_df, 
+                       coords = c("x","y"), 
+                       crs = "WGS 84 / UTM zone 31N")
 
-# Simple Linear Regression
+
+res <- 120 # resolution
+# round extremes to resolution
+(x.min <- bbox(env_div_df)[1,1]%/%res*res)
+(x.max <- (bbox(env_div_df)[1,2]+res)%/%res*res) 
+(y.min <- bbox(meuse)[2,1]%/%res*res)
+(y.max <- (bbox(meuse)[2,2]+res)%/%res*res)
+# grid of coordinates
+grid <- expand.grid(x = seq(x.min, x.max, by=res),
+                    y = seq(y.min, y.max, by=res))
+class(grid)
+coordinates(grid) <- c("x", "y")
+class(grid)
+
+gridded(grid) <- T; fullgrid(grid) <- T
+class(grid)
+
+# removing correlated variables from df without shan_div
+# PerformanceAnalytics::chart.Correlation(env_div_df[, -15], 
+#                                         histogram = TRUE, 
+#                                         pch = 19)
+cor_matrix <- cor(env_div_df[, -15], 
+                  use = "complete.obs", method = "pearson")
+threshold <- 0.8
+highly_correlated_vars <- caret::findCorrelation(cor_matrix, 
+                                          cutoff = threshold, 
+                                          verbose = TRUE)
+df_cleaned <- env_div_df[, -highly_correlated_vars]
+print(df_cleaned)
+
+# B) incorporating Spatial AC into machine learning
+
+# Simple Linear Regression including X and Y
 library(spatialreg)
-
 formula = shan_div ~.
-model1 <- lm(formula = formula, data = data)
+model1 <- lm(formula = formula, data = df_cleaned)
 summary(model1) # degree of freedom: m =independent, n-m-1
 
-# Spatial Regression Models
+# C) Spatial Regression Model with buffer distances
 
-queen_weights <- nb2listw(queen_nb) # from neighbors to weights
+# Create a prediction grid
+bb <- st_bbox(env_div_sf) # get a sf boundary 
+library(terra)
+r <- rast(ext = ext(bb), resolution = 5,
+          crs = crs(env_div_sf))
 
-# lag model
-lag_model <- spatialreg::lagsarlm(
-  formula = formula, 
-  data = data, 
-  listw = queen_weights,
-  zero.policy = TRUE
-)
+# Break into quantiles
 
-summary(lag_model)
+(q.lzn <- quantile(env_div_sf$shan_div, seq(0,1,by=0.0625)))
+env_div_sf$classes.lzn.q <- cut(env_div_sf$shan_div, 
+                     breaks=q.lzn, 
+                     ordered_result=TRUE, 
+                     include.lowest=TRUE)
+levels(env_div_sf$classes.lzn.q)
 
-# error model
-error_model <- spatialreg::errorsarlm(
-  formula = formula, 
-  data = data, 
-  listw = queen_weights
-)
+# Compute buffer distances via landmap
+env_div_sp <- as(env_div_sf, "Spatial") # sf → SpatialPointsDataFrame
+idx <- as.integer(env_div_sf$classes.lzn.q) # Create a factor index of bins
+library(landmap)
+library(sf)
+library(terra)
+library(raster)
+dist_stack <- bufferDist(x = r, y = env_div_sp, z = idx) # Use bufferDist
+# GSIF version
+dist_stack <- GSIF::gBufferDist(x = r, xy = env_div_df[,c("x","y")], 
+                           z = env_div_sf$classes.lzn.q, 
+                           proj4string = proj4string(r))
 
-summary(error_model)
+names(dist_stack2) <- levels(pts_sf$bin)
 
+
+coordinates(env_div_df) <- c("x", "y") # to a SpatialPointsDataFrame
+env_div_df
+bbox(env_div_df)
+res <- 120 # resolution
+# round extremes to resolution
+(x.min <- bbox(env_div_df)[1,1]%/%res*res)
+(x.max <- (bbox(env_div_df)[1,2]+res)%/%res*res) 
+(y.min <- bbox(meuse)[2,1]%/%res*res)
+(y.max <- (bbox(meuse)[2,2]+res)%/%res*res)
+# grid of coordinates
+grid <- expand.grid(x = seq(x.min, x.max, by=res),
+                    y = seq(y.min, y.max, by=res))
+class(grid)
+coordinates(grid) <- c("x", "y")
+class(grid)
+
+gridded(grid) <- T; fullgrid(grid) <- T
+class(grid)
+# Set up the quantiles for the shan_div
+library(ggplot2)
+g <- ggplot(df_cleaned, mapping=aes(x=shan_div))
+g + geom_histogram(bins=16, fill="lightgreen", color="blue") + geom_rug()
+
+(q.lzn <- quantile(df_cleaned$shan_div, seq(0,1,by=0.0625)))
+classes.lzn.q <- cut(df_cleaned$shan_div, breaks=q.lzn, 
+                     ordered_result=TRUE, include.lowest=TRUE)
+levels(classes.lzn.q)
+
+# Compute distance buffers to points in each quantile
+
+coordinates(df_cleaned) <- ~x + y
+grid_dist <- landmap::buffer.dist(df_cleaned["shan_div"], 
+                                  meuse.grid.sp, classes.lzn.q)
+summary(grid.dist.lzn)
 # compare simple linear model with SAG models
 jtools::export_summs(model1, lag_model, error_model)
 

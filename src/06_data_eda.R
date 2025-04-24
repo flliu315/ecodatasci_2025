@@ -23,7 +23,7 @@ rm(list = ls()) # Remove all variables
 # quickservice -> metasearch -> add default (basic map)
 
 # // filling key-value in QUICKOSM for downloading 
-# quickOSM -> waterway and river -> doubs→runs
+# quickOSM -> waterway and river -> doubs →runs
 
 # // obtaining Le Doubs river by selection features
 # open attribution table -> selection by Expression 
@@ -307,7 +307,7 @@ PerformanceAnalytics::chart.Correlation(env_clean,
 # 04-Clustering and ordination
 ###################################################
 # A) Clustering based on transformed data of species
-
+library(vegan)
 spe_dhel <- vegdist(spe_hel, method="euclidean") 
 
 par(mfrow=c(1,1))
@@ -326,7 +326,8 @@ plot(spe_dhel_complete, main="Complete linkage clustering",
 # Multivariant normality; Linear relation between samples.
 
 # a) for species data
-
+spe_hel <- decostand(spe_clean, "hellinger")
+dim(spe_hel)
 vegan::decorana(spe_hel) # model selection
 
 spe_pca <- rda(spe_hel) # run pca with rda() 
@@ -340,8 +341,8 @@ barplot(spe_ev, main="Eigenvalues", col="grey", las=2)
 abline(h=mean(spe_ev), col="red") 
 legend("topright", "Average eigenvalue", lwd=1, col=2, bty="n")
 
-biplot(spe_pca, scaling =1, main="PCA scale=1") 
-biplot(spe_pca, scaling =2, main="PCA scale=2") 
+biplot(spe_pca, scaling =1, main="PCA scaling=1") 
+biplot(spe_pca, scaling =2, main="PCA scaling=2") 
 
 # for env data to compare sites or how correlated
 library(RVAideMemoire)
@@ -362,8 +363,8 @@ abline(h=mean(env_ev), col="red")
 legend("topright", "Average eigenvalue", lwd=1, col=2, bty="n")
 
 plot(env_pca) # explainable variance of the axis
-biplot(env_pca, scaling =1, main="scale=1: object similarity") 
-biplot(env_pca, scaling =2, main="scale=2: importance & corr") 
+biplot(env_pca, scaling =1, main="scaling=1: object similarity") 
+biplot(env_pca, scaling =2, main="scaling=2: importance & corr") 
 
 # C) constrained ordination---RDA
  
@@ -443,39 +444,3 @@ plot(env_spe_rda_pars,
      main = "Scaling 2:  species-environment") # Scaling 2
 # env_spe4_sc <- scores(env_spe_rda_pars, choices = 1:2, display = "sp")
 # arrows(0, 0, env_spe4_sc[,1], env_spe4_sc[,2], length = 0, lty = 1, col = "red")
-
-##############################################
-# 05-Visualizing on a google map
-##############################################
-
-# convert coordinates from no crs to epsg=4326 using qgis
-# // converting xy.csv to xy.png with qgis
-# // using geocoding and quickOSM to find doubs river
-# // A) web→quickmapservice→metasearch→add default for basic map
-# // B) quickOSM→waterway and river→doubs→runs
-# // using freehand georeference Georeferencing an Image
-# // A) digitizing river and sampling points (https://www.youtube.com/watch?v=ZgsXKw2ZjlA)
-# // B) extracting long and lat of points (https://www.youtube.com/watch?v=aEnKHx14LnU)
-# // extracting latlong with shp (https://www.youtube.com/watch?v=bVi7dCBu1hU)
-
-library(tidyverse)
-spa_geo <- read_csv("data/geo_data/spa_geo.csv")
-spa_geo
-
-# map with leaflet
-
-library(leaflet)
-doubs_map <- leaflet(data = spa_geo) %>% 
-  addTiles() %>% # Add default OpenStreetMap map tiles
-  addCircleMarkers(~X, ~Y, radius = ~spe$BCO)
-doubs_map
-
-category <- c(spe$BCO, spe$CHA, spe$BAR, spe$LOC)
-factpal <- colorFactor(topo.colors(4), category)
-doubs_map <- leaflet(data = spa_geo) %>% 
-  addTiles() %>% # Add default OpenStreetMap map tiles
-  addCircleMarkers(~X, ~Y, 
-                   radius = ~c(spe$BCO, spe$CHA, spe$BAR, spe$LOC),
-                   color = ~factpal(category))
-doubs_map
-
