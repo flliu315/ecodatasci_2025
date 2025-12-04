@@ -194,7 +194,6 @@ con
 
 # C) connecting R to a database of PostgreSQL
 
-library(DBI)
 library(RPostgreSQL)
 doubsdata <- DBI::dbConnect(RPostgreSQL::PostgreSQL(), # connect
                           dbname = 'doubs',

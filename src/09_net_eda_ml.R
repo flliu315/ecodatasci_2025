@@ -8,20 +8,20 @@
 # Author:     Fanglin Liu
 # Email:      flliu315@163.com
 # Date:       2025-02-19
-#
 # --------------------------------------------
 cat("\014") # Clears the console
 rm(list = ls()) # Remove all variables
 
 ###############################################################
 # 01- Econetwork graph representation and visualization
+
 # # As the format of a spreadsheet or edgelist
 # 
 from <- c("1","1","2","2","3","4","4","5")
 to <- c("2","4","3","4","4","5","6","6")
 weight <- c(0.1,0.5,0.8,0.2,0.4,0.9,1.0,0.5)
 
-# # Join the variables to create a data frame
+# Join the variables to create a data frame
 links <- data.frame(from, to, weight)
 
 # write.csv(links, "data/net_data/edgelist.csv", row.names = F)
@@ -36,18 +36,20 @@ glimpse(edgelist)
 # visualization with igraph package
 
 library(igraph)
+
 # Undirected Graph
 edgelist_g <- graph_from_data_frame(d = edgelist, directed = F)
 is_weighted(edgelist_g)
 
 set.seed(3523) # Set random seed to ensure graph layout stays
-# plot(edgelist_g, edge.width = E(edgelist_g)$weight)
+plot(edgelist_g, edge.width = E(edgelist_g)$weight)
+
+?tkplot
 tkplot(edgelist_g, edge.width = 1:10)
 
-
 # B) As the format of an adjacency matrix
-library(networkR)
 
+library(networkR)
 from <- c("1","1","2","2","3","4","4","5")
 to <- c("2","4","3","4","4","5","6","6")
 weight <- c(0.1,0.5,0.8,0.2,0.4,0.9,1.0,0.5)
@@ -62,31 +64,36 @@ adj_mat_g <- graph_from_adjacency_matrix(adj_mat,
                                        mode="max", 
                                        diag=F)
 
-plot(adj_mat_g) # plot without edge weights
+tkplot(adj_mat_g) # plot without edge weights
 plot(adj_mat_g, # plot with edge weights
      edge.width = E(adj_mat_g)$weight) 
 
-# C) Convert to incidence matrix for bipartite matrices
+# C) As the format of incidence matrix 
 # https://rpubs.com/lgadar/load-bipartite-graph
 
-# Load packages
-library(igraph)
+inc <- matrix(sample(0:1, 15, repl=TRUE), 3, 5)
+colnames(inc) <- letters[1:5]
+rownames(inc) <- LETTERS[1:3]
+g <- graph_from_incidence_matrix(inc) #  for bipartite graph 
+tkplot(g)
 
-weight <- c(0.1,0.5,0.8,0.9,0,0,1.0,0.5,0.0)
-mat <- matrix(weight, byrow = T, nrow = 3, ncol = 3)
-
-rownames(mat) <- c("1","3","4")
-colnames(mat) <- c("2","5","6")
-
-library(netdiffuseR)
-inc_mat_g <- graph.incidence(mat, weighted = T)
-inc_mat_g
-
-V(inc_mat_g)$type
-V(inc_mat_g)$name
-
-# Graph from matrix
-plot(inc_mat_g, vertex.size=30, edge.color="gray30",edge.width = 1:10, layout=layout_as_bipartite)
+# weight <- c(0.1,0.5,0.8,0.9,0,0,1.0,0.5,0.0)
+# mat <- matrix(weight, byrow = T, nrow = 3, ncol = 3)
+# 
+# rownames(mat) <- c("1","3","4")
+# colnames(mat) <- c("2","5","6")
+# 
+# inc_mat_g <- graph_from_biadjacency_matrix(mat, weighted = T)
+# inc_mat_g
+# 
+# V(inc_mat_g)$type
+# V(inc_mat_g)$name
+# 
+# # Graph from matrix
+# plot(inc_mat_g, vertex.size=30, 
+#      edge.color="gray30",
+#      edge.width = 1:10, 
+#      ayout=layout_as_bipartite)
 
 #########################################################
 # 02-molecular network construction and visualization
@@ -105,12 +112,15 @@ head(otu_control)
 dim(otu_control)
 sum(!is.na(otu_control))
 
+# save(otu_warming, otu_control, 
+#      file = "data/net_data/otu_data.RData")
+
 # keep the rows or otus with < 7 NA in the total of 14 plots
 ### for warming plots
 na_counts_warming <- apply(otu_warming, 1,function(z) sum(is.na(z)))
 length(na_counts_warming)
 
-# delete the OUTs 
+# delete the rows in which the number of NA OUTs > 7
 otu_warming_clean <- otu_warming[na_counts_warming < 7,]
 head(otu_warming_clean)
 dim(otu_warming_clean)
@@ -128,7 +138,8 @@ otu_warming_clean_transform <- otu_warming_clean |>
   replace(is.na(otu_warming_clean), 0) |> # replace NA with 0's value
   t() # transfer from outs x plot to the  plot x otus table
 
-otu_warming_rel <- prop.table(as.matrix(otu_warming_clean_transform), 
+otu_warming_rel <- 
+  prop.table(as.matrix(otu_warming_clean_transform), 
                               margin = 1)*100 # each OTU relative abundance in each plot
 head(otu_warming_rel)
 
@@ -179,8 +190,9 @@ plot(otu_warming_g)
 
 otu_warming_isol_vertex <- 
   V(otu_warming_g)[igraph::degree(otu_warming_g) == 0] # isolated vertices
-otu_warming_g_optimal <- igraph::delete_vertices(otu_warming_g, 
-                                                 otu_warming_isol_vertex)
+otu_warming_g_optimal <- 
+  igraph::delete_vertices(otu_warming_g, 
+                          otu_warming_isol_vertex)
 
 set.seed(123)
 plot(otu_warming_g_optimal, main ="co-occurrence network",
@@ -191,8 +203,9 @@ plot(otu_warming_g_optimal, main ="co-occurrence network",
      edge.lty =1,
      edge.curved =TRUE)
 
-write_graph(otu_warming_g_optimal, "results/otu_warming_net.txt", "edgelist")
-# warming_g <- read_graph(file = "results/otu_warming_net.txt",format = "edgelist",directed=F)
+# write_graph(otu_warming_g_optimal, 
+#             "results/otu_warming_net.txt", "edgelist")
+
 
 ####### for control plots ##############
 
@@ -216,27 +229,34 @@ plot(otu_control_g_optimal, main ="co-occurrence network",
      edge.lty =1,
      edge.curved =TRUE)
 
-write_graph(otu_control_g_optimal, "results/otu_control_net.txt", "edgelist")
+# write_graph(otu_control_g_optimal, 
+#             "results/otu_control_net.txt", "edgelist")
 
-################################################################
-
+################################################
 # 03-network properties and exploratory analysis
+################################################
+# A) Network level properties
 
-# 1) unipartite or one-mode network
-# (1)) Network level properties
-
-# A)  connectance
+#  a) connectance
 # https://bookdown.org/creakysinger/r-note-learn/_book/Nchpter20.html
 library(igraph)
-g<-read_graph("results/otu_warming_net.txt","edgelist")
+
+g <- read_graph("results/otu_warming_net.txt","edgelist")
 g <- as.undirected(g, mode = "collapse")
-plot(g,vertex.frame.color=NA,vertex.label=NA,edge.width=1,
-     vertex.size=5,edge.lty=1,edge.curved=F)
+tkplot(g,
+     vertex.frame.color=NA,
+     vertex.label=NA,
+     edge.width=1,
+     vertex.size=5,
+     edge.lty=1,
+     edge.curved=F)
+
 connectance = edge_density(g,loops=FALSE) # connectance
 connectance
 
-# B) modularity
+# b) modularity
 # https://biosakshat.github.io/network-analysis.html
+
 library(igraph)
 g<-read_graph("results/otu_warming_net.txt","edgelist")
 g <- as.undirected(g, mode = "collapse")
@@ -244,11 +264,11 @@ ceb <- cluster_edge_betweenness(g)
 modularity(ceb)
 plot(ceb, g)
 
-# C) nestedness
+# c) nestedness
 
-# (2) Node level perporties
+# B) Node level perporties
 
-# A) degree and degree distribution
+# a) degree and degree distribution
 
 library(igraph)
 g <-read_graph("results/otu_warming_net.txt","edgelist") 
@@ -260,7 +280,7 @@ deg
 
 hist(deg, breaks=1:vcount(g)-1) # degree distribution
 
-# B) closeness and betweenness centrality
+# b) closeness and betweenness centrality
 
 deg=igraph::degree(g) 
 lay <- layout.fruchterman.reingold(g) # fix layout
@@ -284,7 +304,7 @@ ev
 plot(g,layout=lay, vertex.color=degCol,
      vertex.size=ev*10, vertex.label=NA)
 
-# C) triads and clustering coefficients
+# c) triads and clustering coefficients
 
 triad <- igraph::triad_census(g)
 triad
@@ -293,115 +313,18 @@ cc_global
 cc_local <- igraph::transitivity(g, type = "local")
 cc_local
 
-##----------------------------------------------------------
-## 2) bipartite or two-mode network 
-
-# https://rpubs.com/pjmurphy/317838
-vv1_EL <- read.csv("data/net_data/vv.txt", sep = " ")
-vv1_EL
-vv1_EL$V1 <- LETTERS[vv1_EL$V1] 
-
-library(igraph)
-# create a graph ( UNW, 10 = # of vertex, 8 = # of edges)
-vv1_EL_g <- graph_from_data_frame(vv1_EL, directed=FALSE)
-
-# identify two-mode network by $res=T and $type = F or T 
-bipartite_mapping(vv1_EL_g)
-
-## Add the "type" attribute to the network
-V(vv1_EL_g)$type <- bipartite_mapping(vv1_EL_g)$type  
-
-# modifying shape and color of the V and E 
-V(vv1_EL_g)$color <- ifelse(V(vv1_EL_g)$type, "lightblue", "salmon")
-V(vv1_EL_g)$shape <- ifelse(V(vv1_EL_g)$type, "circle", "square")
-E(vv1_EL_g)$color <- "lightgray"
-
-# adjusting sizes and colors of V labels
-V(vv1_EL_g)$label.color <- "black" 
-V(vv1_EL_g)$label.cex <- 1 
-V(vv1_EL_g)$frame.color <-  "gray"
-V(vv1_EL_g)$size <- 30
-
-# use the bipartite-specific layout to minimize overlap
-plot(vv1_EL_g, 
-     edge.color="gray30",
-     edge.width=E(vv1_EL_g)$weight,
-     layout=layout.bipartite, 
-     vertex.size=20, 
-     vertex.label.cex=1.5)
-
-# Calculating Centrality of two-mode network
-vv_types <- V(vv1_EL_g)$type               
-vv_deg <- igraph::degree(vv1_EL_g)
-vv_bet <- igraph::betweenness(vv1_EL_g)
-vv_clos <- igraph::closeness(vv1_EL_g)
-
-vv_cent_df <- data.frame(vv_types, vv_deg, vv_bet, vv_clos)
-vv_cent_df[order(vv_cent_df$vv_types, decreasing = TRUE),] 
-
 ########################################################
-# 04-link predition with ML
+# 04-making link prediction of otu_warming net with ML
 
-
-# Install and load necessary libraries
-install.packages("tidygraph")
-install.packages("dplyr")
 library(tidygraph)
 library(dplyr)
+library(igraph)
 
-# Create a sample graph (same as before)
-g <- graph_from_data_frame(d = data.frame(from = c("A", "A", "B", "C"), 
-                                          to = c("B", "C", "D", "D")), 
-                           directed = FALSE)
-
-# Convert the graph from igraph to tidygraph
-g_tidy <- as_tbl_graph(g)
-
-# Define a new function to find possible links (edges that can be safely removed)
-find_possible_links_v2 <- function(g) {
-  # Convert graph edges to tibble for easy access
-  edges_df <- as_tibble(g, what = "edges")
-  
-  # Initialize an empty list to hold the possible links
-  possible_links <- list()
-  
-  # Loop through each edge in the graph
-  for (i in seq_len(nrow(edges_df))) {
-    # Extract the current edge
-    current_edge <- edges_df[i, ]
-    
-    # Remove the edge from the graph
-    g_temp <- g %>% activate(edges) %>% delete_edges(i)
-    
-    # Check if the graph is still connected after removing the edge
-    if (is_connected(g_temp)) {
-      # If connected, add the edge to the possible links list
-      possible_links[[length(possible_links) + 1]] <- current_edge
-    }
-  }
-  
-  # Convert the list of possible links to a tibble and return
-  message(paste0("Found ", length(possible_links), " possible links"))
-  
-  # Combine the list into a tibble with correct column names
-  possible_links_df <- bind_rows(possible_links) %>%
-    select(from, to)  # Ensure the columns are "from" and "to"
-  
-  return(possible_links_df)
-}
-
-# Run the new function
-possible_edges_v2 <- find_possible_links_v2(g_tidy)
-print(possible_edges_v2)
-
-
-
-
-
-
-# load the MEN graph
-g <- read_graph("results/otu_warming_net.txt","edgelist")
-g <- as.undirected(g, mode = "collapse")
+# load otu_warming_net data
+g <- read_graph("results/otu_warming_net.txt",
+                             format = "edgelist")
+g <- as.undirected(g, 
+                   mode = "collapse") # each, mutual
 
 # Get the node IDs
 node_ids <- V(g)
@@ -422,7 +345,9 @@ positive_edges$label <- 1
 
 # Generate negative samples (non-existing edges)
 possible_edges <- t(combn(V(g), 2))
-existing_edges <- as_edgelist(g)
+length(possible_edges)
+existing_edges <- get.edgelist(g) # Get edge list from graph
+length(existing_edges)
 existing_edges <- apply(existing_edges, 1, 
                         function(x) paste(sort(x), collapse = "-"))
 possible_edges <- apply(possible_edges, 1, 
@@ -449,8 +374,10 @@ adj_matrix <- as.matrix(as_adjacency_matrix(g))
 edge_features <- apply(edges[, 1:2], 1, function(edge) {
   adj_matrix[edge[1], ] + adj_matrix[edge[2], ]
 })
+
 edge_features <- t(edge_features)
 
+library(keras)
 # Define the model
 model <- keras_model_sequential() |>
   layer_dense(units = 32, activation = "relu", 
@@ -487,4 +414,6 @@ pred <- data.frame(ids = as.integer(node_ids),
                    links = as.integer(predictions))
 head(pred)
 sum(pred$links == 1)
-readr::write_csv(pred, "results/link_pred.csv")
+
+# readr::write_csv(pred, "results/link_pred.csv")
+
